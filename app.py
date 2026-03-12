@@ -1,6 +1,7 @@
 """
-PHARMA-GUARD Streamlit Arayüzü
+PHARMA-GUARD AI - Streamlit Arayüzü
 Yapay Zeka Destekli Akıllı İlaç Denetçisi
+DOM Hatası Düzeltildi - v2.1
 """
 
 import streamlit as st
@@ -51,71 +52,53 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-def initialize_system():
-    """Sistemi başlatır"""
-    create_data_directories()
-    
+def load_api_keys():
+    """API anahtarlarını yükler"""
     groq_key = None
     gemini_key = None
     
-    # 1. Önce Streamlit secrets'tan dene (en güvenilir)
+    # 1. Streamlit secrets
     try:
         if hasattr(st, 'secrets'):
-            if 'GROQ_API_KEY' in st.secrets:
-                groq_key = st.secrets['GROQ_API_KEY']
-            if 'GOOGLE_API_KEY' in st.secrets:
-                gemini_key = st.secrets['GOOGLE_API_KEY']
-    except Exception as e:
+            groq_key = st.secrets.get('GROQ_API_KEY')
+            gemini_key = st.secrets.get('GOOGLE_API_KEY') or st.secrets.get('GEMINI_API_KEY')
+    except Exception:
         pass
     
-    # 2. .streamlit/secrets.toml dosyasından doğrudan oku
+    # 2. .streamlit/secrets.toml
     if not groq_key or not gemini_key:
         try:
             with open('.streamlit/secrets.toml', 'r', encoding='utf-8') as f:
                 for line in f:
                     if 'GROQ_API_KEY' in line and '=' in line and not groq_key:
                         groq_key = line.split('=')[1].strip().strip('"').strip("'")
-                    if 'GOOGLE_API_KEY' in line and '=' in line and not gemini_key:
+                    if ('GOOGLE_API_KEY' in line or 'GEMINI_API_KEY' in line) and '=' in line and not gemini_key:
                         gemini_key = line.split('=')[1].strip().strip('"').strip("'")
-        except Exception as e:
+        except Exception:
             pass
     
-    # 3. .env dosyasından dene
+    # 3. .env dosyası
     if not groq_key or not gemini_key:
         try:
             load_dotenv(override=True)
-            if not groq_key:
-                groq_key = os.getenv("GROQ_API_KEY")
-            if not gemini_key:
-                gemini_key = os.getenv("GOOGLE_API_KEY")
-        except Exception as e:
+            groq_key = groq_key or os.getenv("GROQ_API_KEY")
+            gemini_key = gemini_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        except Exception:
             pass
     
-    # 4. .env dosyasından doğrudan oku
+    # 4. .env dosyasından doğrudan
     if not groq_key or not gemini_key:
         try:
             with open('.env', 'r', encoding='utf-8') as f:
                 for line in f:
                     if line.startswith('GROQ_API_KEY=') and not groq_key:
                         groq_key = line.split('=', 1)[1].strip()
-                    if line.startswith('GOOGLE_API_KEY=') and not gemini_key:
+                    if (line.startswith('GOOGLE_API_KEY=') or line.startswith('GEMINI_API_KEY=')) and not gemini_key:
                         gemini_key = line.split('=', 1)[1].strip()
-        except Exception as e:
+        except Exception:
             pass
     
-    # Hata kontrolü
-    if not groq_key:
-        st.error("⚠️ GROQ_API_KEY bulunamadı!")
-        st.stop()
-    
-    # Gemini opsiyonel
-    if not gemini_key or gemini_key == "your_gemini_api_key_here":
-        st.sidebar.warning("⚠️ Gemini API anahtarı yok - Görsel analizi simüle edilecek")
-        gemini_key = None
-    else:
-        st.sidebar.success("✅ Gemini Vision aktif")
-    
-    return PharmaGuardOrchestrator(groq_key, gemini_key)
+    return groq_key, gemini_key
 
 
 def main():
@@ -125,31 +108,63 @@ def main():
     st.markdown('<h1 class="main-header">💊 PHARMA-GUARD AI</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; color: #666;">Yapay Zeka Destekli Akıllı İlaç Denetçisi</p>', unsafe_allow_html=True)
     
+    # API anahtarlarını yükle
+    groq_key, gemini_key = load_api_keys()
+    
     # Sidebar
     with st.sidebar:
-        st.image("https://img.icons8.com/fluency/96/000000/pill.png", width=80)
-        st.title("Sistem Bilgileri")
+        st.title("💊 Sistem Bilgileri")
+        
+        # API durumu
+        if groq_key:
+            st.success("✅ Groq API: Aktif")
+        else:
+            st.error("❌ Groq API: Bulunamadı")
+            st.info("Lütfen `.env` veya `.streamlit/secrets.toml` dosyasına GROQ_API_KEY ekleyin")
+        
+        if gemini_key and gemini_key != "your_gemini_api_key_here":
+            st.success("✅ Gemini API: Aktif")
+        else:
+            st.warning("⚠️ Gemini API: Yok (Simülasyon modu)")
+        
+        st.divider()
+        
         st.info("""
-        **Aktif Ajanlar (Groq-Only):**
-        - 🔍 Vision Scanner (Llama 3.2 Vision)
-        - 📚 RAG Specialist (Llama 3.1)
-        - ⚠️ Safety Auditor (Llama 3.1)
-        - 📊 Report Synthesizer (Llama 3.1)
+        **Aktif Ajanlar:**
+        - 🔍 Vision Scanner
+        - 📚 RAG Specialist (11,000+ ilaç)
+        - ⚠️ Safety Auditor
+        - 📊 Report Synthesizer
         """)
         
         st.divider()
         
-        st.subheader("Kullanım Kılavuzu")
+        st.subheader("📖 Kullanım Kılavuzu")
         st.markdown("""
         1. İlaç kutusunun net fotoğrafını yükleyin
         2. Analiz butonuna tıklayın
         3. Raporu inceleyin ve indirin
         
-        **Not:** İyi aydınlatma ve net görüntü önemlidir!
+        **İpucu:** İyi aydınlatma ve net görüntü önemlidir!
         """)
     
+    # API key kontrolü
+    if not groq_key:
+        st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen API anahtarınızı yapılandırın.")
+        st.info("""
+        **Hızlı Çözüm:**
+        1. https://console.groq.com → API Keys
+        2. Yeni anahtar oluştur
+        3. `.env` veya `.streamlit/secrets.toml` dosyasına ekle
+        4. Sayfayı yenile
+        """)
+        return
+    
+    # Sistemi başlat
+    create_data_directories()
+    
     # Ana içerik
-    tab1, tab2, tab3 = st.tabs(["📸 Analiz", "📚 Prospektüs Yönetimi", "ℹ️ Hakkında"])
+    tab1, tab2, tab3 = st.tabs(["� Analiz", "📚 Prospektüs", "ℹ️ Hakkında"])
     
     with tab1:
         st.subheader("İlaç Görsel Analizi")
@@ -164,43 +179,37 @@ def main():
             col1, col2 = st.columns([1, 1])
             
             with col1:
-                st.image(uploaded_file, caption="Yüklenen Görsel", use_column_width=True)
+                st.image(uploaded_file, caption="Yüklenen Görsel", use_container_width=True)
             
             with col2:
-                if st.button("🔬 Analizi Başlat", type="primary"):
+                if st.button("🔬 Analizi Başlat", type="primary", use_container_width=True):
                     with st.spinner("Çoklu ajan sistemi çalışıyor..."):
-                        # Dosyayı kaydet
-                        temp_path = os.path.join("uploads", uploaded_file.name)
-                        with open(temp_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-                        
-                        # Görsel doğrulama
-                        if not validate_image(temp_path):
-                            st.error("❌ Geçersiz görsel dosyası!")
-                            return
-                        
-                        # Boyutlandır
-                        resized_path = resize_image(temp_path)
-                        
-                        # Sistemi başlat ve analiz et
-                        orchestrator = initialize_system()
-                        
                         try:
+                            # Dosyayı kaydet
+                            temp_path = os.path.join("uploads", uploaded_file.name)
+                            with open(temp_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
+                            
+                            # Görsel doğrulama
+                            if not validate_image(temp_path):
+                                st.error("❌ Geçersiz görsel dosyası!")
+                                return
+                            
+                            # Boyutlandır
+                            resized_path = resize_image(temp_path)
+                            
+                            # Orchestrator oluştur
+                            orchestrator = PharmaGuardOrchestrator(groq_key, gemini_key)
+                            
+                            # Analiz et
                             results = orchestrator.analyze_drug(resized_path)
                             
-                            # Hata kontrolü - Vision
+                            # Hata kontrolü
                             vision_data = results.get("vision", {})
                             if "error" in vision_data:
                                 if vision_data.get("error") == "API_KEY_INVALID":
                                     st.error("🔑 API Anahtarı Geçersiz!")
                                     st.info(vision_data.get("error_detail", ""))
-                                    st.info("""
-                                    **Hızlı Çözüm:**
-                                    1. https://console.groq.com → API Keys
-                                    2. Yeni anahtar oluştur
-                                    3. `.env` veya `.streamlit/secrets.toml` dosyasını güncelle
-                                    4. Streamlit'i yeniden başlat (Ctrl+C sonra tekrar çalıştır)
-                                    """)
                                     return
                                 elif vision_data.get("error") == "RATE_LIMIT":
                                     st.warning("⏱️ API Limit Aşıldı!")
@@ -208,22 +217,24 @@ def main():
                                     return
                                 else:
                                     st.error(f"❌ {vision_data.get('error_detail', 'Bilinmeyen hata')}")
+                                    return
                             
-                            # Güven puanı hesapla
+                            # Güven puanı
                             confidence = calculate_confidence_score(results)
                             
-                            # Uyarı göster
-                            if confidence < 8:
-                                st.markdown(f'<div class="warning-box">⚠️ <b>DİKKAT:</b> Güven puanı düşük ({confidence:.1f}/10). Bilgiler %100 doğrulanamadı, profesyonel yardım alın!</div>', unsafe_allow_html=True)
-                            else:
-                                st.markdown(f'<div class="success-box">✅ Analiz tamamlandı. Güven puanı: {confidence:.1f}/10</div>', unsafe_allow_html=True)
-                            
-                            # Raporu göster
+                            # Sonuçları göster
                             st.divider()
+                            
+                            if confidence < 8:
+                                st.warning(f"⚠️ Güven puanı: {confidence:.1f}/10 - Bilgiler %100 doğrulanamadı!")
+                            else:
+                                st.success(f"✅ Analiz tamamlandı! Güven puanı: {confidence:.1f}/10")
+                            
+                            # Rapor
                             st.markdown("### 📋 Analiz Raporu")
                             st.markdown(results["report"])
                             
-                            # Rapor dosyası oluştur
+                            # Rapor indirme
                             st.divider()
                             pdf_gen = PDFReportGenerator()
                             report_path = pdf_gen.generate_report(results, "reports/rapor.txt")
@@ -234,20 +245,20 @@ def main():
                                         label="📥 Raporu TXT Olarak İndir",
                                         data=report_file.read(),
                                         file_name=f"pharma_guard_rapor_{uploaded_file.name}.txt",
-                                        mime="text/plain"
+                                        mime="text/plain",
+                                        use_container_width=True
                                     )
                             
                         except Exception as e:
                             st.error(f"❌ Analiz sırasında hata oluştu: {str(e)}")
+                            st.exception(e)
     
     with tab2:
-        st.subheader("📚 Prospektüs Veritabanı Yönetimi")
+        st.subheader("� Prospektüs Veritabanı")
         
         st.info("""
         Prospektüs bilgilerini `data/corpus/` klasörüne .txt dosyası olarak ekleyin.
-        Sistem Groq ile semantik arama yapacaktır.
-        
-        **Örnek format:** ilac_adi.txt (düz metin olarak prospektüs içeriği)
+        Sistem akıllı arama yapacaktır.
         """)
         
         corpus_path = "data/corpus"
@@ -255,23 +266,30 @@ def main():
             txt_files = [f for f in os.listdir(corpus_path) if f.endswith('.txt')]
             
             if txt_files:
-                st.success(f"✅ {len(txt_files)} adet prospektüs bulundu:")
-                for txt in txt_files:
-                    st.text(f"📄 {txt}")
+                st.success(f"✅ {len(txt_files):,} adet prospektüs bulundu")
+                
+                with st.expander("📄 Prospektüs Listesi (İlk 20)"):
+                    for txt in txt_files[:20]:
+                        st.text(f"• {txt}")
+                    if len(txt_files) > 20:
+                        st.text(f"... ve {len(txt_files) - 20:,} dosya daha")
             else:
-                st.warning("⚠️ Henüz prospektüs eklenmemiş. Lütfen .txt dosyalarını data/corpus/ klasörüne ekleyin.")
+                st.warning("⚠️ Henüz prospektüs eklenmemiş.")
         
         st.divider()
         
-        if st.button("🔄 Prospektüsleri Yükle"):
+        if st.button("🔄 Prospektüsleri Yeniden Yükle", use_container_width=True):
             with st.spinner("Prospektüsler yükleniyor..."):
-                orchestrator = initialize_system()
-                success = orchestrator.rag_agent.initialize_db()
-                
-                if success:
-                    st.success("✅ Prospektüsler başarıyla yüklendi!")
-                else:
-                    st.error("❌ Prospektüsler yüklenemedi. Lütfen .txt dosyalarını kontrol edin.")
+                try:
+                    orchestrator = PharmaGuardOrchestrator(groq_key, gemini_key)
+                    success = orchestrator.rag_agent.initialize_db()
+                    
+                    if success:
+                        st.success("✅ Prospektüsler başarıyla yüklendi!")
+                    else:
+                        st.error("❌ Prospektüsler yüklenemedi.")
+                except Exception as e:
+                    st.error(f"❌ Hata: {str(e)}")
     
     with tab3:
         st.subheader("ℹ️ Proje Hakkında")
@@ -283,16 +301,10 @@ def main():
         
         ### 🤖 Kullanılan Teknolojiler
         
-        - **Groq (Llama 3.2 Vision):** Görsel analiz ve OCR
-        - **Groq (Llama 3.1 70B):** Güvenlik denetimi ve rapor sentezi
+        - **Google Gemini Vision 2.5 Flash:** Görsel analiz
+        - **Groq Llama 3.3 70B:** Metin analizi ve RAG
         - **Streamlit:** Kullanıcı arayüzü
-        
-        ### ⚡ Neden Sadece Groq?
-        
-        - Çok hızlı inference (saniyeler içinde)
-        - Ücretsiz tier cömert (günlük limit yüksek)
-        - Vision + Text modelleri tek platformda
-        - Kurulum basit, bağımlılık az
+        - **11,226 İlaç Prospektüsü:** Kapsamlı veritabanı
         
         ### 👥 Ajan Mimarisi
         
@@ -303,12 +315,19 @@ def main():
         
         ### ⚠️ Önemli Uyarı
         
-        Bu sistem eğitim amaçlıdır. Tıbbi kararlar için mutlaka sağlık profesyoneline danışın!
+        Bu sistem **eğitim amaçlıdır**. Tıbbi kararlar için mutlaka sağlık profesyoneline danışın!
+        
+        ### 📊 İstatistikler
+        
+        - **Toplam İlaç:** 11,226
+        - **Kategoriler:** 21
+        - **Veritabanı Boyutu:** 10.03 MB
+        - **Güven Puanı:** 8-9/10
         
         ---
         
-        **Proje:** Yapay Zeka Uygulamaları ve Veri Bilimi  
-        **Tema:** Sağlık Teknolojileri ve Yapay Zeka Etiği
+        **Versiyon:** 2.1 (DOM Hatası Düzeltildi)  
+        **Lisans:** MIT (Eğitim Amaçlı)
         """)
 
 
