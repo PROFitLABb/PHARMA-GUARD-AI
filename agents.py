@@ -1,6 +1,8 @@
 """
-PHARMA-GUARD Multi-Agent System (Groq Llama Vision)
-Tek API ile hem görsel hem metin analizi
+PHARMA-GUARD Multi-Agent System
+Orkestratör: Groq Llama 3.3 70B
+Vision: LLaVA v1.6 (Replicate)
+RAG: Lokal prospektüs arama
 """
 
 import os
@@ -8,6 +10,7 @@ import json
 import base64
 from typing import Dict, List, Optional
 from groq import Groq
+import replicate
 
 # Master System Prompt
 MASTER_PROMPT = """
@@ -39,42 +42,101 @@ AŞAĞIDAKİ 5 ALT AJANI AYNI ANDA KOORDİNE ET:
 
 
 class VisionAgent:
-    """Manuel ilaç girişi - Vision modelleri kullanımdan kaldırıldı"""
+    """Görsel analiz ajanı - LLaVA v1.6 ile ilaç kutusunu tarar"""
     
-    def __init__(self, groq_client):
-        self.client = groq_client
+    def __init__(self, replicate_token: str = None):
+        self.replicate_token = replicate_token
+        if replicate_token:
+            os.environ["REPLICATE_API_TOKEN"] = replicate_token
     
     def analyze_image(self, image_path: str, manual_drug_name: str = None) -> Dict:
-        """Manuel ilaç adı girişi (Vision modelleri deprecated)"""
+        """İlaç görselini analiz eder (LLaVA v1.6)"""
         try:
+            # Manuel giriş varsa öncelik ver
             if manual_drug_name and manual_drug_name.strip():
-                # Manuel girişle devam et
                 return {
                     "ticari_ad": manual_drug_name.strip(),
-                    "etken_madde": "Manuel analiz gerekiyor",
-                    "dozaj": "Manuel analiz gerekiyor",
-                    "form": "Manuel analiz gerekiyor",
+                    "etken_madde": "Görsel analizden belirlenecek",
+                    "dozaj": "Görsel analizden belirlenecek",
+                    "form": "Görsel analizden belirlenecek",
                     "barkod": "",
-                    "guven_puani": 5,
-                    "notlar": "Manuel ilaç adı girişi. Prospektüs araması yapılacak.",
+                    "guven_puani": 6,
+                    "notlar": "Manuel ilaç adı + görsel analiz kombinasyonu",
                     "manual_entry": True
                 }
-            else:
-                # Vision modeli yok, manuel giriş gerekiyor
+            
+            # Replicate token kontrolü
+            if not self.replicate_token:
                 return {
                     "ticari_ad": "Bilinmiyor",
                     "etken_madde": "Bilinmiyor",
                     "dozaj": "Bilinmiyor",
                     "form": "Bilinmiyor",
                     "barkod": "",
-                    "error": "VISION_NOT_AVAILABLE",
-                    "error_type": "NotImplementedError",
-                    "user_message": "Görsel analiz şu anda kullanılamıyor. Lütfen ilaç adını manuel girin.",
+                    "error": "NO_REPLICATE_TOKEN",
+                    "error_type": "ConfigError",
+                    "user_message": "Replicate API token bulunamadı. Lütfen ilaç adını manuel girin.",
                     "guven_puani": 0,
-                    "notlar": "Vision modelleri kullanımdan kaldırıldı. Manuel giriş gerekiyor."
+                    "notlar": "Replicate API token gerekiyor"
                 }
             
-        except Exception as e:
+            # Dosya kontrolü
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
+            
+            # Dosya boyutu kontrolü (max 10MB)
+            file_size = os.path.getsize(image_path)
+            if file_size > 10 * 1024 * 1024:
+                raise ValueError(f"Görsel çok büyük ({file_size / 1024 / 1024:.1f}MB). Maksimum 10MB olmalı.")
+            
+            # Görseli base64'e çevir
+            with open(image_path, 'rb') as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
+            
+            # LLaVA v1.6 ile analiz
+            prompt = """Bu ilaç kutusunu analiz et. Sadece şu bilgileri JSON formatında ver:
+{
+  "ticari_ad": "kutu üzerindeki ilaç adı",
+  "etken_madde": "aktif madde adı (varsa)",
+  "dozaj": "mg/ml değeri",
+  "form": "Tablet/Şurup/Kapsül",
+  "guven_puani": 1-10
+}
+
+Sadece JSON formatında yanıt ver."""
+
+            output = replicate.run(
+                "yorickvp/llava-v1.6-34b:41ecfbfb261e6c1adf3ad896c9066ca98346996d7c4045c5bc944a79d430f174",
+                input={
+                    "image": f"data:image/jpeg;base64,{image_data}",
+                    "prompt": prompt,
+                    "max_tokens": 512,
+                    "temperature": 0.1
+                }
+            )
+            
+            # Output'u birleştir (generator olabilir)
+            result_text = "".join(output) if hasattr(output, '__iter__') else str(output)
+            result_text = result_text.strip()
+            
+            # JSON parse et
+            if "```json" in result_text:
+                result_text = result_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in result_text:
+                result_text = result_text.split("```")[1].split("```")[0].strip()
+            
+            parsed_result = json.loads(result_text)
+            
+            # Zorunlu alanları kontrol et
+            required_fields = ["ticari_ad", "etken_madde", "dozaj", "form", "guven_puani"]
+            for field in required_fields:
+                if field not in parsed_result:
+                    parsed_result[field] = "Bilinmiyor" if field != "guven_puani" else 5
+            
+            parsed_result["notlar"] = "LLaVA v1.6 görsel analizi"
+            return parsed_result
+            
+        except FileNotFoundError as e:
             return {
                 "ticari_ad": "Bilinmiyor",
                 "etken_madde": "Bilinmiyor",
@@ -82,10 +144,66 @@ class VisionAgent:
                 "form": "Bilinmiyor",
                 "barkod": "",
                 "error": str(e),
-                "error_type": type(e).__name__,
-                "user_message": "Hata oluştu. Lütfen ilaç adını manuel girin.",
+                "error_type": "FileNotFoundError",
+                "user_message": "Görsel dosyası bulunamadı",
                 "guven_puani": 0,
-                "notlar": str(e)
+                "notlar": "Dosya yükleme hatası"
+            }
+        
+        except ValueError as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": str(e),
+                "error_type": "ValueError",
+                "user_message": str(e),
+                "guven_puani": 0,
+                "notlar": "Görsel boyut hatası"
+            }
+        
+        except json.JSONDecodeError as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": f"JSON parse hatası: {str(e)}",
+                "error_type": "JSONDecodeError",
+                "user_message": "AI yanıtı işlenemedi. Lütfen ilaç adını manuel girin.",
+                "guven_puani": 0,
+                "notlar": "JSON parse hatası"
+            }
+        
+        except Exception as e:
+            error_msg = str(e)
+            user_friendly_msg = "Görsel analizi başarısız oldu"
+            
+            print(f"❌ VisionAgent Hatası: {error_msg}")
+            print(f"   Hata Tipi: {type(e).__name__}")
+            
+            # Özel hata mesajları
+            if "401" in error_msg or "unauthorized" in error_msg.lower():
+                user_friendly_msg = "Replicate API token geçersiz"
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                user_friendly_msg = "Replicate API limiti aşıldı. Birkaç dakika bekleyin."
+            elif "timeout" in error_msg.lower():
+                user_friendly_msg = "İstek zaman aşımına uğradı. Lütfen tekrar deneyin."
+            
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": error_msg,
+                "error_type": type(e).__name__,
+                "user_message": user_friendly_msg,
+                "guven_puani": 0,
+                "notlar": user_friendly_msg
             }
         """İlaç görselini analiz eder (Groq Llama Vision)"""
         try:
@@ -583,13 +701,13 @@ Sorun devam ederse: https://github.com/groq/groq-python/issues
 
 
 class PharmaGuardOrchestrator:
-    """Ana orkestratör - Tüm ajanları koordine eder (Groq Llama Vision)"""
+    """Ana orkestratör - Groq (Orkestra) + LLaVA (Vision) + RAG"""
     
-    def __init__(self, groq_key: str):
+    def __init__(self, groq_key: str, replicate_token: str = None):
         self.groq_client = Groq(api_key=groq_key)
         
-        # Groq Llama Vision kullan
-        self.vision_agent = VisionAgent(self.groq_client)
+        # LLaVA Vision Agent
+        self.vision_agent = VisionAgent(replicate_token)
             
         self.rag_agent = RAGAgent(groq_client=self.groq_client)
         self.safety_auditor = SafetyAuditor(groq_key)

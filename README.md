@@ -43,10 +43,11 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 
 ## ✨ Özellikler
 
-### 📝 Manuel İlaç Girişi
-- **Manuel ilaç adı girişi** (Vision modelleri deprecated)
-- İlaç adı, etken madde, dozaj bilgileri
-- 11,226 ilaç prospektüsü veritabanı
+### 🔍 Görsel Analiz
+- **LLaVA v1.6 (34B)** açık kaynak vision model
+- İlaç adı, etken madde, dozaj ve form tespiti
+- Replicate API üzerinden çalışır
+- Manuel giriş desteği (opsiyonel)
 
 ### 📚 Kapsamlı Veritabanı
 - **11,226 ilaç** prospektüsü
@@ -77,8 +78,8 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## 🛠️ Teknoloji Stack
 
 ### AI & ML
-- **Manuel İlaç Girişi** - Kullanıcı ilaç adını girer
-- **Groq Llama 3.3 70B** - Metin analizi ve RAG
+- **LLaVA v1.6 (34B)** - Açık kaynak vision model (Replicate)
+- **Groq Llama 3.3 70B** - Orkestratör, metin analizi ve RAG
 - **RAG (Retrieval-Augmented Generation)** - 11,226 prospektüs arama
 
 ### Backend

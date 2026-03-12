@@ -33,11 +33,13 @@ st.markdown("""
 def load_api_keys():
     """API anahtarlarını yükler"""
     groq_key = None
+    replicate_token = None
     
     try:
         # 1. Streamlit secrets
         if hasattr(st, 'secrets'):
             groq_key = st.secrets.get('GROQ_API_KEY')
+            replicate_token = st.secrets.get('REPLICATE_API_TOKEN')
     except:
         pass
     
@@ -45,8 +47,9 @@ def load_api_keys():
     if not groq_key:
         load_dotenv()
         groq_key = os.getenv("GROQ_API_KEY")
+        replicate_token = replicate_token or os.getenv("REPLICATE_API_TOKEN")
     
-    return groq_key
+    return groq_key, replicate_token
 
 
 def main():
@@ -57,7 +60,7 @@ def main():
     st.markdown('<p style="text-align: center; color: #666;">Yapay Zeka Destekli Akıllı İlaç Denetçisi</p>', unsafe_allow_html=True)
     
     # API anahtarlarını yükle
-    groq_key = load_api_keys()
+    groq_key, replicate_token = load_api_keys()
     
     # Sidebar
     with st.sidebar:
@@ -65,19 +68,25 @@ def main():
         
         if groq_key:
             st.success("✅ Groq API: Aktif")
-            st.info("🔍 Groq Llama Vision kullanılıyor")
         else:
             st.error("❌ Groq API: Yok")
+        
+        if replicate_token:
+            st.success("✅ Replicate API: Aktif")
+            st.info("🔍 LLaVA v1.6 Vision aktif")
+        else:
+            st.warning("⚠️ Replicate API: Yok")
+            st.info("📝 Manuel giriş modu")
         
         st.divider()
         st.info("""
         **Aktif Ajanlar:**
-        - � Manuel Giriş
+        - 🔍 LLaVA v1.6 Vision
         - 📚 RAG Specialist (11,226 ilaç)
         - ⚠️ Safety Auditor
         - 📊 Report Synthesizer
         
-        **Not:** Vision modelleri deprecated
+        **Orkestratör:** Groq Llama 3.3 70B
         """)
     
     # API key kontrolü
@@ -98,41 +107,34 @@ def main():
         st.stop()
     
     # Ana içerik
-    st.subheader("📸 İlaç Analizi")
+    st.subheader("📸 İlaç Görsel Analizi")
     
     st.info("""
-    ℹ️ **Önemli:** Groq vision modelleri kullanımdan kaldırıldı. 
-    Lütfen ilaç adını manuel olarak girin.
+    🔍 **LLaVA v1.6 Vision** ile otomatik görsel analiz
+    📝 Manuel giriş de destekleniyor (opsiyonel)
     """)
     
-    # Manuel ilaç adı girişi
+    # Manuel ilaç adı girişi (opsiyonel)
     manual_drug_name = st.text_input(
-        "İlaç Adı",
+        "İlaç Adı (Opsiyonel - Görsel analizi desteklemek için)",
         placeholder="Örn: Parol, Aspirin, Majezik",
-        help="İlaç kutusunda yazan ticari adı girin"
+        help="Boş bırakırsanız sadece görsel analiz kullanılır"
     )
     
     uploaded_file = st.file_uploader(
-        "İlaç kutusunun fotoğrafını yükleyin (opsiyonel)",
+        "İlaç kutusunun fotoğrafını yükleyin",
         type=["jpg", "jpeg", "png"],
-        help="Referans için görsel yükleyebilirsiniz"
+        help="Net, iyi aydınlatılmış bir fotoğraf yükleyin"
     )
     
-    if manual_drug_name or uploaded_file:
+    if uploaded_file:
         col1, col2 = st.columns([1, 1])
         
         with col1:
-            if uploaded_file:
-                st.image(uploaded_file, caption="Yüklenen Görsel", use_container_width=True)
-            else:
-                st.info("📝 Manuel giriş modu")
+            st.image(uploaded_file, caption="Yüklenen Görsel", use_container_width=True)
         
         with col2:
-            if st.button("🔬 Analizi Başlat", type="primary", use_container_width=True, disabled=not manual_drug_name):
-                
-                if not manual_drug_name:
-                    st.error("❌ Lütfen ilaç adını girin!")
-                    return
+            if st.button("� Analizi Başlat", type="primary", use_container_width=True):
                 
                 # Progress container
                 progress_container = st.container()
@@ -150,36 +152,36 @@ def main():
                         create_data_directories()
                         st.success("✅ Klasörler hazır")
                         
-                        # Dosyayı kaydet (varsa)
-                        if uploaded_file:
-                            st.info("💾 Görsel kaydediliyor...")
-                            temp_path = os.path.join("uploads", uploaded_file.name)
-                            with open(temp_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
-                            st.success(f"✅ Kaydedildi: {temp_path}")
-                            
-                            # Doğrula
-                            st.info("🔍 Görsel doğrulanıyor...")
-                            if not validate_image(temp_path):
-                                st.error("❌ Geçersiz görsel!")
-                                return
-                            st.success("✅ Görsel geçerli")
-                            
-                            # Boyutlandır
-                            st.info("📐 Boyutlandırılıyor...")
-                            resized_path = resize_image(temp_path)
-                            st.success("✅ Boyutlandırıldı")
-                        else:
-                            # Görsel yoksa dummy path
-                            resized_path = "dummy.jpg"
+                        # Dosyayı kaydet
+                        st.info("💾 Görsel kaydediliyor...")
+                        temp_path = os.path.join("uploads", uploaded_file.name)
+                        with open(temp_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        st.success(f"✅ Kaydedildi")
+                        
+                        # Doğrula
+                        st.info("� Görsel doğrulanıyor...")
+                        if not validate_image(temp_path):
+                            st.error("❌ Geçersiz görsel!")
+                            return
+                        st.success("✅ Görsel geçerli")
+                        
+                        # Boyutlandır
+                        st.info("📐 Boyutlandırılıyor...")
+                        resized_path = resize_image(temp_path)
+                        st.success("✅ Boyutlandırıldı")
                         
                         # AI Sistemi
                         st.info("🤖 AI sistemi başlatılıyor...")
-                        orchestrator = PharmaGuardOrchestrator(groq_key)
+                        orchestrator = PharmaGuardOrchestrator(groq_key, replicate_token)
                         st.success("✅ AI sistemi hazır")
                         
-                        # Analiz (manuel ilaç adı ile)
-                        st.info(f"🔬 '{manual_drug_name}' analiz ediliyor... (30-60 saniye)")
+                        # Analiz
+                        if manual_drug_name:
+                            st.info(f"🔬 '{manual_drug_name}' + görsel analiz ediliyor...")
+                        else:
+                            st.info("🔬 Görsel analiz yapılıyor (LLaVA v1.6)...")
+                        
                         results = orchestrator.analyze_drug(resized_path, manual_drug_name)
                         st.success("✅ Analiz tamamlandı!")
                         
