@@ -1,0 +1,89 @@
+═══════════════════════════════════════════════════════════
+  GOOGLE GEMINI API ANAHTARI NASIL ALINIR?
+═══════════════════════════════════════════════════════════
+
+GERÇEK GÖRSEL ANALİZİ İÇİN GEMİNİ GEREKLİ!
+
+ADIM 1: Google AI Studio'ya Gidin
+─────────────────────────────────────────────────────────
+https://makersuite.google.com/app/apikey
+
+ADIM 2: Google Hesabı ile Giriş Yapın
+─────────────────────────────────────────────────────────
+- Gmail hesabınızla giriş yapın
+- Ücretsiz!
+
+ADIM 3: API Anahtarı Oluşturun
+─────────────────────────────────────────────────────────
+1. "Create API Key" butonuna tıklayın
+2. Proje seçin veya yeni proje oluşturun
+3. Anahtarı kopyalayın (AIza... ile başlar)
+
+ADIM 4: Anahtarı Projeye Ekleyin
+─────────────────────────────────────────────────────────
+
+YÖNTEM A: .env Dosyası
+────────────────────────
+.env dosyasını açın ve ekleyin:
+
+GROQ_API_KEY=gsk_...
+GOOGLE_API_KEY=AIza_BURAYA_GEMİNİ_ANAHTARINIZ
+
+YÖNTEM B: secrets.toml
+────────────────────────
+.streamlit/secrets.toml dosyasını açın:
+
+GROQ_API_KEY = "gsk_..."
+GOOGLE_API_KEY = "AIza_BURAYA_GEMİNİ_ANAHTARINIZ"
+
+ADIM 5: Streamlit'i Yeniden Başlatın
+─────────────────────────────────────────────────────────
+1. Terminal'de Ctrl+C
+2. streamlit run app.py
+
+ADIM 6: Test Edin
+─────────────────────────────────────────────────────────
+- İlaç fotoğrafı yükleyin
+- Sidebar'da "✅ Gemini Vision aktif" göreceksiniz
+- Artık GERÇEK görsel analizi yapılacak!
+
+
+ÜCRETSİZ LİMİTLER
+─────────────────────────────────────────────────────────
+✅ Gemini 2.0 Flash: 15 istek/dakika
+✅ Günlük: 1,500 istek
+✅ Aylık: Ücretsiz tier yeterli
+
+Bu limitler proje için fazlasıyla yeterli!
+
+
+SORUN GİDERME
+─────────────────────────────────────────────────────────
+
+❌ "API_KEY_INVALID" hatası:
+   → Anahtarı yeniden kopyalayın
+   → Boşluk veya satır sonu olmadığından emin olun
+
+❌ "RESOURCE_EXHAUSTED" hatası:
+   → Günlük limitiniz dolmuş
+   → Yarın tekrar deneyin
+
+❌ Hala simüle ediyor:
+   → Streamlit'i tamamen kapatıp açın
+   → .env veya secrets.toml'u kontrol edin
+
+
+GEMİNİ OLMADAN DA ÇALIŞIR!
+─────────────────────────────────────────────────────────
+
+Gemini API anahtarı yoksa:
+- Sistem çalışmaya devam eder
+- Görsel analizi simüle edilir
+- Prospektüs ve güvenlik analizi yapılır
+
+Ama gerçek görsel analizi için Gemini şart!
+
+
+═══════════════════════════════════════════════════════════
+  Başarılar! 🚀
+═══════════════════════════════════════════════════════════
