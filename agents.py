@@ -465,7 +465,7 @@ class PharmaGuardOrchestrator:
         self.report_synthesizer = ReportSynthesizer(groq_key)
     
     def analyze_drug(self, image_path: str) -> Dict:
-        """Tam ilaç analizi pipeline'ı - Hata yakalama iyileştirildi"""
+        """Tam ilaç analizi pipeline'ı - Rate limit optimized"""
         
         try:
             # 1. Görsel Analiz
@@ -485,45 +485,91 @@ class PharmaGuardOrchestrator:
                         "notlar": f"Görsel analiz hatası: {str(vision_error)}"
                     }
             else:
-                # Fallback: Simüle et
                 vision_result = {
                     "ticari_ad": "Görsel analizi yapılamadı",
                     "etken_madde": "Bilinmiyor",
                     "dozaj": "Bilinmiyor",
                     "form": "Bilinmiyor",
                     "guven_puani": 0,
-                    "notlar": "Gemini API anahtarı bulunamadı. Gerçek görsel analizi için GEMINI_API_KEY gerekli."
+                    "notlar": "Gemini API anahtarı bulunamadı."
                 }
             
-            # 2. RAG Arama
-            try:
-                drug_name = vision_result.get("ticari_ad", "Bilinmeyen İlaç")
-                rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
-            except Exception as rag_error:
-                print(f"⚠️ RAG arama hatası: {rag_error}")
+            # 2. RAG Arama - SADECE görsel analiz başarılıysa
+            if vision_result.get("guven_puani", 0) > 0:
+                try:
+                    drug_name = vision_result.get("ticari_ad", "Bilinmeyen İlaç")
+                    rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
+                except Exception as rag_error:
+                    print(f"⚠️ RAG arama hatası: {rag_error}")
+                    rag_results = [{
+                        "content": "Prospektüs bilgisi bulunamadı.",
+                        "source": "Sistem",
+                        "guven_puani": 0
+                    }]
+            else:
+                # Görsel analiz başarısızsa RAG'i atla
                 rag_results = [{
-                    "content": f"Prospektüs araması başarısız: {str(rag_error)}",
-                    "source": "Hata",
+                    "content": "Görsel analizi başarısız olduğu için prospektüs araması yapılamadı.",
+                    "source": "Sistem",
                     "guven_puani": 0
                 }]
             
-            # 3. Güvenlik Denetimi
-            try:
-                safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
-            except Exception as safety_error:
-                print(f"⚠️ Güvenlik denetimi hatası: {safety_error}")
+            # 3. Güvenlik Denetimi - SADECE gerekirse
+            if vision_result.get("guven_puani", 0) > 5:
+                try:
+                    safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
+                except Exception as safety_error:
+                    print(f"⚠️ Güvenlik denetimi hatası: {safety_error}")
+                    safety_result = {
+                        "risk_level": "UNKNOWN",
+                        "warnings": ["Güvenlik analizi yapılamadı"],
+                        "guven_puani": 0
+                    }
+            else:
+                # Güven puanı düşükse güvenlik denetimini atla
                 safety_result = {
                     "risk_level": "UNKNOWN",
-                    "warnings": [f"Güvenlik analizi başarısız: {str(safety_error)}"],
+                    "warnings": ["Görsel analizi yetersiz, güvenlik denetimi yapılamadı"],
                     "guven_puani": 0
                 }
             
-            # 4. Rapor Sentezi
+            # 4. Rapor Sentezi - SADECE bir kez
             try:
                 final_report = self.report_synthesizer.synthesize_report(vision_result, rag_results, safety_result)
             except Exception as report_error:
                 print(f"⚠️ Rapor sentezi hatası: {report_error}")
-                final_report = f"# Rapor Oluşturulamadı\n\nHata: {str(report_error)}"
+                
+                # Rate limit hatası mı?
+                if "429" in str(report_error) or "rate_limit" in str(report_error).lower():
+                    final_report = f"""# ⏱️ API LİMİTİ AŞILDI
+
+## Sorun
+Groq API kullanım limitiniz doldu (Dakikada 30 istek).
+
+## Çözüm
+**Lütfen 1-2 dakika bekleyin ve tekrar deneyin.**
+
+Groq ücretsiz tier limitleri:
+- 30 istek/dakika
+- 14,400 istek/gün
+
+## Analiz Sonuçları (Kısmi)
+
+### İlaç Bilgileri
+- **Ticari Ad:** {vision_result.get('ticari_ad', 'Bilinmiyor')}
+- **Etken Madde:** {vision_result.get('etken_madde', 'Bilinmiyor')}
+- **Dozaj:** {vision_result.get('dozaj', 'Bilinmiyor')}
+- **Form:** {vision_result.get('form', 'Bilinmiyor')}
+
+### Notlar
+{vision_result.get('notlar', 'Bilgi yok')}
+
+---
+
+⚠️ **UYARI:** Detaylı rapor oluşturulamadı. Lütfen birkaç dakika bekleyip tekrar deneyin.
+"""
+                else:
+                    final_report = f"# Rapor Oluşturulamadı\n\nHata: {str(report_error)}"
             
             return {
                 "vision": vision_result,
@@ -546,5 +592,5 @@ class PharmaGuardOrchestrator:
                 },
                 "rag": [{"content": "Analiz başarısız", "source": "Hata", "guven_puani": 0}],
                 "safety": {"risk_level": "UNKNOWN", "warnings": [], "guven_puani": 0},
-                "report": f"# Analiz Başarısız\n\nHata: {str(e)}\n\nLütfen tekrar deneyin veya farklı bir görsel yükleyin."
+                "report": f"# Analiz Başarısız\n\nHata: {str(e)}\n\nLütfen tekrar deneyin."
             }
