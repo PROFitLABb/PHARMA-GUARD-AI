@@ -72,12 +72,12 @@ def main():
         st.divider()
         st.info("""
         **Aktif Ajanlar:**
-        - 🔍 Vision Scanner (Llama 3.2)
-        - 📚 RAG Specialist
+        - � Manuel Giriş
+        - 📚 RAG Specialist (11,226 ilaç)
         - ⚠️ Safety Auditor
         - 📊 Report Synthesizer
         
-        **Tek API:** Groq
+        **Not:** Vision modelleri deprecated
         """)
     
     # API key kontrolü
@@ -98,22 +98,41 @@ def main():
         st.stop()
     
     # Ana içerik
-    st.subheader("📸 İlaç Görsel Analizi")
+    st.subheader("📸 İlaç Analizi")
     
-    uploaded_file = st.file_uploader(
-        "İlaç kutusunun fotoğrafını yükleyin",
-        type=["jpg", "jpeg", "png"],
-        help="Net, iyi aydınlatılmış bir fotoğraf yükleyin"
+    st.info("""
+    ℹ️ **Önemli:** Groq vision modelleri kullanımdan kaldırıldı. 
+    Lütfen ilaç adını manuel olarak girin.
+    """)
+    
+    # Manuel ilaç adı girişi
+    manual_drug_name = st.text_input(
+        "İlaç Adı",
+        placeholder="Örn: Parol, Aspirin, Majezik",
+        help="İlaç kutusunda yazan ticari adı girin"
     )
     
-    if uploaded_file:
+    uploaded_file = st.file_uploader(
+        "İlaç kutusunun fotoğrafını yükleyin (opsiyonel)",
+        type=["jpg", "jpeg", "png"],
+        help="Referans için görsel yükleyebilirsiniz"
+    )
+    
+    if manual_drug_name or uploaded_file:
         col1, col2 = st.columns([1, 1])
         
         with col1:
-            st.image(uploaded_file, caption="Yüklenen Görsel", use_container_width=True)
+            if uploaded_file:
+                st.image(uploaded_file, caption="Yüklenen Görsel", use_container_width=True)
+            else:
+                st.info("📝 Manuel giriş modu")
         
         with col2:
-            if st.button("🔬 Analizi Başlat", type="primary", use_container_width=True):
+            if st.button("🔬 Analizi Başlat", type="primary", use_container_width=True, disabled=not manual_drug_name):
+                
+                if not manual_drug_name:
+                    st.error("❌ Lütfen ilaç adını girin!")
+                    return
                 
                 # Progress container
                 progress_container = st.container()
@@ -131,33 +150,37 @@ def main():
                         create_data_directories()
                         st.success("✅ Klasörler hazır")
                         
-                        # Dosyayı kaydet
-                        st.info("💾 Görsel kaydediliyor...")
-                        temp_path = os.path.join("uploads", uploaded_file.name)
-                        with open(temp_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
-                        st.success(f"✅ Kaydedildi: {temp_path}")
-                        
-                        # Doğrula
-                        st.info("🔍 Görsel doğrulanıyor...")
-                        if not validate_image(temp_path):
-                            st.error("❌ Geçersiz görsel!")
-                            st.stop()
-                        st.success("✅ Görsel geçerli")
-                        
-                        # Boyutlandır
-                        st.info("📐 Boyutlandırılıyor...")
-                        resized_path = resize_image(temp_path)
-                        st.success("✅ Boyutlandırıldı")
+                        # Dosyayı kaydet (varsa)
+                        if uploaded_file:
+                            st.info("💾 Görsel kaydediliyor...")
+                            temp_path = os.path.join("uploads", uploaded_file.name)
+                            with open(temp_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
+                            st.success(f"✅ Kaydedildi: {temp_path}")
+                            
+                            # Doğrula
+                            st.info("🔍 Görsel doğrulanıyor...")
+                            if not validate_image(temp_path):
+                                st.error("❌ Geçersiz görsel!")
+                                return
+                            st.success("✅ Görsel geçerli")
+                            
+                            # Boyutlandır
+                            st.info("📐 Boyutlandırılıyor...")
+                            resized_path = resize_image(temp_path)
+                            st.success("✅ Boyutlandırıldı")
+                        else:
+                            # Görsel yoksa dummy path
+                            resized_path = "dummy.jpg"
                         
                         # AI Sistemi
                         st.info("🤖 AI sistemi başlatılıyor...")
                         orchestrator = PharmaGuardOrchestrator(groq_key)
                         st.success("✅ AI sistemi hazır")
                         
-                        # Analiz
-                        st.info("🔬 Analiz yapılıyor... (30-60 saniye)")
-                        results = orchestrator.analyze_drug(resized_path)
+                        # Analiz (manuel ilaç adı ile)
+                        st.info(f"🔬 '{manual_drug_name}' analiz ediliyor... (30-60 saniye)")
+                        results = orchestrator.analyze_drug(resized_path, manual_drug_name)
                         st.success("✅ Analiz tamamlandı!")
                         
                         # Temizle progress

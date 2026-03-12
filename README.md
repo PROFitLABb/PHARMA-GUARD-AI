@@ -43,10 +43,10 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 
 ## ✨ Özellikler
 
-### 🔍 Görsel Analiz
-- **Groq Llama 3.2 Vision (11B)** ile ilaç kutusu tanıma
-- İlaç adı, etken madde, dozaj ve form tespiti
-- Yüksek doğruluk oranı (8-9/10 güven puanı)
+### 📝 Manuel İlaç Girişi
+- **Manuel ilaç adı girişi** (Vision modelleri deprecated)
+- İlaç adı, etken madde, dozaj bilgileri
+- 11,226 ilaç prospektüsü veritabanı
 
 ### 📚 Kapsamlı Veritabanı
 - **11,226 ilaç** prospektüsü
@@ -77,9 +77,9 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## 🛠️ Teknoloji Stack
 
 ### AI & ML
-- **Groq Llama 3.2 Vision (11B)** - Görsel analiz
+- **Manuel İlaç Girişi** - Kullanıcı ilaç adını girer
 - **Groq Llama 3.3 70B** - Metin analizi ve RAG
-- **RAG (Retrieval-Augmented Generation)** - Prospektüs arama
+- **RAG (Retrieval-Augmented Generation)** - 11,226 prospektüs arama
 
 ### Backend
 - **Python 3.8+**
@@ -206,8 +206,9 @@ GROQ_API_KEY=gsk_your_api_key_here
 ```
 
 **Modeller**: 
-- llama-3.2-11b-vision-preview (Görsel analiz)
-- llama-3.3-70b-versatile (Metin analiz)
+- llama-3.3-70b-versatile (Metin analiz ve RAG)
+
+**Not:** Vision modelleri Groq tarafından kullanımdan kaldırıldı. Manuel giriş kullanılıyor.
 
 ### Streamlit Secrets (Alternatif)
 

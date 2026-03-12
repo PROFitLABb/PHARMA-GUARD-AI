@@ -39,12 +39,54 @@ AŞAĞIDAKİ 5 ALT AJANI AYNI ANDA KOORDİNE ET:
 
 
 class VisionAgent:
-    """Görsel analiz ajanı - Groq Llama Vision ile ilaç kutusunu tarar"""
+    """Manuel ilaç girişi - Vision modelleri kullanımdan kaldırıldı"""
     
     def __init__(self, groq_client):
         self.client = groq_client
     
-    def analyze_image(self, image_path: str) -> Dict:
+    def analyze_image(self, image_path: str, manual_drug_name: str = None) -> Dict:
+        """Manuel ilaç adı girişi (Vision modelleri deprecated)"""
+        try:
+            if manual_drug_name and manual_drug_name.strip():
+                # Manuel girişle devam et
+                return {
+                    "ticari_ad": manual_drug_name.strip(),
+                    "etken_madde": "Manuel analiz gerekiyor",
+                    "dozaj": "Manuel analiz gerekiyor",
+                    "form": "Manuel analiz gerekiyor",
+                    "barkod": "",
+                    "guven_puani": 5,
+                    "notlar": "Manuel ilaç adı girişi. Prospektüs araması yapılacak.",
+                    "manual_entry": True
+                }
+            else:
+                # Vision modeli yok, manuel giriş gerekiyor
+                return {
+                    "ticari_ad": "Bilinmiyor",
+                    "etken_madde": "Bilinmiyor",
+                    "dozaj": "Bilinmiyor",
+                    "form": "Bilinmiyor",
+                    "barkod": "",
+                    "error": "VISION_NOT_AVAILABLE",
+                    "error_type": "NotImplementedError",
+                    "user_message": "Görsel analiz şu anda kullanılamıyor. Lütfen ilaç adını manuel girin.",
+                    "guven_puani": 0,
+                    "notlar": "Vision modelleri kullanımdan kaldırıldı. Manuel giriş gerekiyor."
+                }
+            
+        except Exception as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "user_message": "Hata oluştu. Lütfen ilaç adını manuel girin.",
+                "guven_puani": 0,
+                "notlar": str(e)
+            }
         """İlaç görselini analiz eder (Groq Llama Vision)"""
         try:
             import base64
@@ -553,32 +595,33 @@ class PharmaGuardOrchestrator:
         self.safety_auditor = SafetyAuditor(groq_key)
         self.report_synthesizer = ReportSynthesizer(groq_key)
     
-    def analyze_drug(self, image_path: str) -> Dict:
-        """Tam ilaç analizi pipeline'ı - Groq Llama Vision"""
+    def analyze_drug(self, image_path: str, manual_drug_name: str = None) -> Dict:
+        """Tam ilaç analizi pipeline'ı - Manuel giriş destekli"""
         
         try:
-            # 1. Görsel Analiz (Groq Llama Vision)
+            # 1. İlaç Adı Belirleme (Manuel veya Vision)
             try:
-                vision_result = self.vision_agent.analyze_image(image_path)
+                vision_result = self.vision_agent.analyze_image(image_path, manual_drug_name)
             except Exception as vision_error:
                 print(f"⚠️ Görsel analiz hatası: {vision_error}")
                 vision_result = {
-                    "ticari_ad": "Görsel analizi başarısız",
+                    "ticari_ad": manual_drug_name if manual_drug_name else "Bilinmiyor",
                     "etken_madde": "Bilinmiyor",
                     "dozaj": "Bilinmiyor",
                     "form": "Bilinmiyor",
-                    "guven_puani": 0,
+                    "guven_puani": 3 if manual_drug_name else 0,
                     "error": "VISION_ERROR",
                     "error_detail": str(vision_error),
                     "error_type": type(vision_error).__name__,
-                    "user_message": "Groq Llama Vision analizi başarısız oldu",
-                    "notlar": f"Görsel analiz hatası: {str(vision_error)}"
+                    "user_message": "Görsel analiz yapılamadı. Manuel giriş kullanılıyor." if manual_drug_name else "Görsel analiz başarısız",
+                    "notlar": f"Manuel giriş: {manual_drug_name}" if manual_drug_name else "Görsel analiz hatası",
+                    "manual_entry": bool(manual_drug_name)
                 }
             
-            # 2. RAG Arama - SADECE görsel analiz başarılıysa
-            if vision_result.get("guven_puani", 0) > 0:
+            # 2. RAG Arama - İlaç adı varsa
+            drug_name = vision_result.get("ticari_ad", "")
+            if drug_name and drug_name != "Bilinmiyor" and vision_result.get("guven_puani", 0) > 0:
                 try:
-                    drug_name = vision_result.get("ticari_ad", "Bilinmeyen İlaç")
                     rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
                 except Exception as rag_error:
                     print(f"⚠️ RAG arama hatası: {rag_error}")
@@ -588,15 +631,15 @@ class PharmaGuardOrchestrator:
                         "guven_puani": 0
                     }]
             else:
-                # Görsel analiz başarısızsa RAG'i atla
+                # İlaç adı yoksa RAG'i atla
                 rag_results = [{
-                    "content": "Görsel analizi başarısız olduğu için prospektüs araması yapılamadı.",
+                    "content": "İlaç adı belirlenemediği için prospektüs araması yapılamadı.",
                     "source": "Sistem",
                     "guven_puani": 0
                 }]
             
             # 3. Güvenlik Denetimi - SADECE gerekirse
-            if vision_result.get("guven_puani", 0) > 5:
+            if vision_result.get("guven_puani", 0) > 3:
                 try:
                     safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
                 except Exception as safety_error:
