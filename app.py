@@ -33,13 +33,11 @@ st.markdown("""
 def load_api_keys():
     """API anahtarlarını yükler"""
     groq_key = None
-    replicate_token = None
     
     try:
         # 1. Streamlit secrets
         if hasattr(st, 'secrets'):
             groq_key = st.secrets.get('GROQ_API_KEY')
-            replicate_token = st.secrets.get('REPLICATE_API_TOKEN')
     except:
         pass
     
@@ -47,9 +45,8 @@ def load_api_keys():
     if not groq_key:
         load_dotenv()
         groq_key = os.getenv("GROQ_API_KEY")
-        replicate_token = replicate_token or os.getenv("REPLICATE_API_TOKEN")
     
-    return groq_key, replicate_token
+    return groq_key
 
 
 def main():
@@ -60,7 +57,7 @@ def main():
     st.markdown('<p style="text-align: center; color: #666;">Yapay Zeka Destekli Akıllı İlaç Denetçisi</p>', unsafe_allow_html=True)
     
     # API anahtarlarını yükle
-    groq_key, replicate_token = load_api_keys()
+    groq_key = load_api_keys()
     
     # Sidebar
     with st.sidebar:
@@ -71,17 +68,12 @@ def main():
         else:
             st.error("❌ Groq API: Yok")
         
-        if replicate_token:
-            st.success("✅ Replicate API: Aktif")
-            st.info("🔍 LLaVA v1.6 Vision aktif")
-        else:
-            st.warning("⚠️ Replicate API: Yok")
-            st.info("📝 Manuel giriş modu")
+        st.info("🔍 Tesseract OCR aktif")
         
         st.divider()
         st.info("""
         **Aktif Ajanlar:**
-        - 🔍 LLaVA v1.6 Vision
+        - 🔍 Tesseract OCR (Lokal)
         - 📚 RAG Specialist (11,226 ilaç)
         - ⚠️ Safety Auditor
         - 📊 Report Synthesizer
@@ -110,7 +102,7 @@ def main():
     st.subheader("📸 İlaç Görsel Analizi")
     
     st.info("""
-    🔍 **LLaVA v1.6 Vision** ile otomatik görsel analiz
+    🔍 **Tesseract OCR** ile otomatik metin çıkarma
     📝 Manuel giriş de destekleniyor (opsiyonel)
     """)
     
@@ -173,14 +165,14 @@ def main():
                         
                         # AI Sistemi
                         st.info("🤖 AI sistemi başlatılıyor...")
-                        orchestrator = PharmaGuardOrchestrator(groq_key, replicate_token)
+                        orchestrator = PharmaGuardOrchestrator(groq_key)
                         st.success("✅ AI sistemi hazır")
                         
                         # Analiz
                         if manual_drug_name:
                             st.info(f"🔬 '{manual_drug_name}' + görsel analiz ediliyor...")
                         else:
-                            st.info("🔬 Görsel analiz yapılıyor (LLaVA v1.6)...")
+                            st.info("🔬 Görsel analiz yapılıyor (OCR)...")
                         
                         results = orchestrator.analyze_drug(resized_path, manual_drug_name)
                         st.success("✅ Analiz tamamlandı!")

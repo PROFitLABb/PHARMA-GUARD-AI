@@ -44,9 +44,9 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## ✨ Özellikler
 
 ### 🔍 Görsel Analiz
-- **LLaVA v1.6 (34B)** açık kaynak vision model
+- **Tesseract OCR** ile metin çıkarma (ücretsiz, lokal)
 - İlaç adı, etken madde, dozaj ve form tespiti
-- Replicate API üzerinden çalışır
+- Türkçe + İngilizce dil desteği
 - Manuel giriş desteği (opsiyonel)
 
 ### 📚 Kapsamlı Veritabanı
@@ -78,7 +78,7 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## 🛠️ Teknoloji Stack
 
 ### AI & ML
-- **LLaVA v1.6 (34B)** - Açık kaynak vision model (Replicate)
+- **Tesseract OCR** - Ücretsiz, lokal metin çıkarma
 - **Groq Llama 3.3 70B** - Orkestratör, metin analizi ve RAG
 - **RAG (Retrieval-Augmented Generation)** - 11,226 prospektüs arama
 
@@ -86,10 +86,11 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 - **Python 3.8+**
 - **Streamlit** - Web framework
 - **Pillow** - Görsel işleme
+- **pytesseract** - OCR kütüphanesi
 - **python-dotenv** - Ortam değişkenleri
 
 ### APIs
-- Groq Cloud API (Vision + Text)
+- Groq Cloud API (Text Analysis)
 
 ---
 

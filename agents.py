@@ -1,16 +1,20 @@
 """
 PHARMA-GUARD Multi-Agent System
 Orkestratör: Groq Llama 3.3 70B
-Vision: LLaVA v1.6 (Replicate)
+Vision: Tesseract OCR (Ücretsiz, Lokal)
 RAG: Lokal prospektüs arama
 """
 
 import os
 import json
-import base64
 from typing import Dict, List, Optional
 from groq import Groq
-import replicate
+try:
+    import pytesseract
+    from PIL import Image
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
 
 # Master System Prompt
 MASTER_PROMPT = """
@@ -42,15 +46,14 @@ AŞAĞIDAKİ 5 ALT AJANI AYNI ANDA KOORDİNE ET:
 
 
 class VisionAgent:
-    """Görsel analiz ajanı - LLaVA v1.6 ile ilaç kutusunu tarar"""
+    """Görsel analiz ajanı - Tesseract OCR ile metin çıkarma"""
     
-    def __init__(self, replicate_token: str = None):
-        self.replicate_token = replicate_token
-        if replicate_token:
-            os.environ["REPLICATE_API_TOKEN"] = replicate_token
+    def __init__(self, groq_client):
+        self.groq_client = groq_client
+        self.ocr_available = TESSERACT_AVAILABLE
     
     def analyze_image(self, image_path: str, manual_drug_name: str = None) -> Dict:
-        """İlaç görselini analiz eder (LLaVA v1.6)"""
+        """İlaç görselini analiz eder (OCR + Groq)"""
         try:
             # Manuel giriş varsa öncelik ver
             if manual_drug_name and manual_drug_name.strip():
@@ -61,63 +64,77 @@ class VisionAgent:
                     "form": "Görsel analizden belirlenecek",
                     "barkod": "",
                     "guven_puani": 6,
-                    "notlar": "Manuel ilaç adı + görsel analiz kombinasyonu",
+                    "notlar": "Manuel ilaç adı girişi",
                     "manual_entry": True
                 }
             
-            # Replicate token kontrolü
-            if not self.replicate_token:
+            # OCR kontrolü
+            if not self.ocr_available:
                 return {
                     "ticari_ad": "Bilinmiyor",
                     "etken_madde": "Bilinmiyor",
                     "dozaj": "Bilinmiyor",
                     "form": "Bilinmiyor",
                     "barkod": "",
-                    "error": "NO_REPLICATE_TOKEN",
+                    "error": "OCR_NOT_AVAILABLE",
                     "error_type": "ConfigError",
-                    "user_message": "Replicate API token bulunamadı. Lütfen ilaç adını manuel girin.",
+                    "user_message": "OCR kütüphanesi yüklü değil. Lütfen ilaç adını manuel girin.",
                     "guven_puani": 0,
-                    "notlar": "Replicate API token gerekiyor"
+                    "notlar": "Tesseract OCR gerekiyor"
                 }
             
             # Dosya kontrolü
             if not os.path.exists(image_path):
                 raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
             
-            # Dosya boyutu kontrolü (max 10MB)
-            file_size = os.path.getsize(image_path)
-            if file_size > 10 * 1024 * 1024:
-                raise ValueError(f"Görsel çok büyük ({file_size / 1024 / 1024:.1f}MB). Maksimum 10MB olmalı.")
+            # Görseli aç
+            image = Image.open(image_path)
             
-            # Görseli base64'e çevir
-            with open(image_path, 'rb') as f:
-                image_data = base64.b64encode(f.read()).decode('utf-8')
+            # OCR ile metin çıkar (Türkçe + İngilizce)
+            extracted_text = pytesseract.image_to_string(image, lang='tur+eng')
             
-            # LLaVA v1.6 ile analiz
-            prompt = """Bu ilaç kutusunu analiz et. Sadece şu bilgileri JSON formatında ver:
-{
-  "ticari_ad": "kutu üzerindeki ilaç adı",
-  "etken_madde": "aktif madde adı (varsa)",
-  "dozaj": "mg/ml değeri",
-  "form": "Tablet/Şurup/Kapsül",
-  "guven_puani": 1-10
-}
-
-Sadece JSON formatında yanıt ver."""
-
-            output = replicate.run(
-                "yorickvp/llava-v1.6-34b:41ecfbfb261e6c1adf3ad896c9066ca98346996d7c4045c5bc944a79d430f174",
-                input={
-                    "image": f"data:image/jpeg;base64,{image_data}",
-                    "prompt": prompt,
-                    "max_tokens": 512,
-                    "temperature": 0.1
+            if not extracted_text or len(extracted_text.strip()) < 3:
+                return {
+                    "ticari_ad": "Bilinmiyor",
+                    "etken_madde": "Bilinmiyor",
+                    "dozaj": "Bilinmiyor",
+                    "form": "Bilinmiyor",
+                    "barkod": "",
+                    "error": "NO_TEXT_FOUND",
+                    "error_type": "OCRError",
+                    "user_message": "Görsel üzerinde metin bulunamadı. Lütfen daha net bir fotoğraf çekin veya ilaç adını manuel girin.",
+                    "guven_puani": 0,
+                    "notlar": "OCR metin bulamadı"
                 }
+            
+            # Groq ile metni analiz et
+            prompt = f"""
+            Aşağıdaki metin bir ilaç kutusundan OCR ile çıkarılmıştır. 
+            Bu metinden ilaç bilgilerini çıkar ve JSON formatında ver:
+            
+            METIN:
+            {extracted_text[:1000]}
+            
+            JSON FORMAT:
+            {{
+                "ticari_ad": "ilaç adı",
+                "etken_madde": "aktif madde",
+                "dozaj": "mg/ml değeri",
+                "form": "Tablet/Şurup/Kapsül",
+                "guven_puani": 1-10
+            }}
+            
+            Sadece JSON formatında yanıt ver. Bulamazsan "Bilinmiyor" yaz.
+            """
+            
+            response = self.groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=512
             )
             
-            # Output'u birleştir (generator olabilir)
-            result_text = "".join(output) if hasattr(output, '__iter__') else str(output)
-            result_text = result_text.strip()
+            result_text = response.choices[0].message.content.strip()
             
             # JSON parse et
             if "```json" in result_text:
@@ -133,7 +150,8 @@ Sadece JSON formatında yanıt ver."""
                 if field not in parsed_result:
                     parsed_result[field] = "Bilinmiyor" if field != "guven_puani" else 5
             
-            parsed_result["notlar"] = "LLaVA v1.6 görsel analizi"
+            parsed_result["notlar"] = f"OCR + Groq analizi ({len(extracted_text)} karakter okundu)"
+            parsed_result["ocr_text"] = extracted_text[:200]  # İlk 200 karakter
             return parsed_result
             
         except FileNotFoundError as e:
@@ -148,20 +166,6 @@ Sadece JSON formatında yanıt ver."""
                 "user_message": "Görsel dosyası bulunamadı",
                 "guven_puani": 0,
                 "notlar": "Dosya yükleme hatası"
-            }
-        
-        except ValueError as e:
-            return {
-                "ticari_ad": "Bilinmiyor",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "barkod": "",
-                "error": str(e),
-                "error_type": "ValueError",
-                "user_message": str(e),
-                "guven_puani": 0,
-                "notlar": "Görsel boyut hatası"
             }
         
         except json.JSONDecodeError as e:
@@ -186,173 +190,10 @@ Sadece JSON formatında yanıt ver."""
             print(f"   Hata Tipi: {type(e).__name__}")
             
             # Özel hata mesajları
-            if "401" in error_msg or "unauthorized" in error_msg.lower():
-                user_friendly_msg = "Replicate API token geçersiz"
+            if "tesseract" in error_msg.lower():
+                user_friendly_msg = "OCR sistemi bulunamadı. Lütfen ilaç adını manuel girin."
             elif "429" in error_msg or "rate_limit" in error_msg.lower():
-                user_friendly_msg = "Replicate API limiti aşıldı. Birkaç dakika bekleyin."
-            elif "timeout" in error_msg.lower():
-                user_friendly_msg = "İstek zaman aşımına uğradı. Lütfen tekrar deneyin."
-            
-            return {
-                "ticari_ad": "Bilinmiyor",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "barkod": "",
-                "error": error_msg,
-                "error_type": type(e).__name__,
-                "user_message": user_friendly_msg,
-                "guven_puani": 0,
-                "notlar": user_friendly_msg
-            }
-
-
-class RAGAgent:
-    """Basit metin tabanlı prospektüs arama ajanı (ChromaDB olmadan)"""
-    
-    def __init__(self, corpus_path: str = "data/corpus", groq_client: Groq = None):
-        self.corpus_path = corpus_path
-        self.groq_client = groq_client
-        self.prospectus_data = {}
-        # Otomatik olarak yükle
-        self.initialize_db()
-
-        
-    def initialize_db(self):
-        """Metin dosyalarını yükler (basit arama için)"""
-        try:
-            # Klasör yoksa oluştur
-            if not os.path.exists(self.corpus_path):
-                raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
-            
-            # Dosya boyutu kontrolü (max 20MB)
-            file_size = os.path.getsize(image_path)
-            if file_size > 20 * 1024 * 1024:
-                raise ValueError(f"Görsel çok büyük ({file_size / 1024 / 1024:.1f}MB). Maksimum 20MB olmalı.")
-            
-            # Görseli base64'e çevir
-            with open(image_path, 'rb') as f:
-                image_data = base64.b64encode(f.read()).decode('utf-8')
-            
-            prompt = """
-            Bu ilaç kutusunu analiz et ve aşağıdaki bilgileri JSON formatında çıkar:
-            {
-                "ticari_ad": "İlaç adı",
-                "etken_madde": "Kimyasal/aktif madde",
-                "dozaj": "mg/ml değeri",
-                "form": "Tablet/Şurup/Kapsül",
-                "barkod": "Varsa barkod numarası",
-                "guven_puani": 1-10 arası,
-                "notlar": "Okunamayan veya belirsiz bilgiler"
-            }
-            
-            KURAL: Eğer yazı net okunmuyorsa tahmin etme, "guven_puani" düşür ve "notlar"a yaz.
-            Sadece JSON formatında yanıt ver, başka açıklama ekleme.
-            """
-            
-            # Groq Llama 3.2 Vision (11B)
-            response = self.client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_data}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                temperature=0.1,
-                max_tokens=1024,
-                timeout=30  # 30 saniye timeout
-            )
-            
-            # JSON parse et
-            result_text = response.choices[0].message.content.strip()
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            
-            parsed_result = json.loads(result_text)
-            
-            # Zorunlu alanları kontrol et
-            required_fields = ["ticari_ad", "etken_madde", "dozaj", "form", "guven_puani"]
-            for field in required_fields:
-                if field not in parsed_result:
-                    parsed_result[field] = "Bilinmiyor" if field != "guven_puani" else 0
-            
-            return parsed_result
-            
-        except FileNotFoundError as e:
-            return {
-                "ticari_ad": "Bilinmiyor",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "barkod": "",
-                "error": str(e),
-                "error_type": "FileNotFoundError",
-                "user_message": "Görsel dosyası bulunamadı",
-                "guven_puani": 0,
-                "notlar": "Dosya yükleme hatası"
-            }
-        
-        except ValueError as e:
-            return {
-                "ticari_ad": "Bilinmiyor",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "barkod": "",
-                "error": str(e),
-                "error_type": "ValueError",
-                "user_message": str(e),
-                "guven_puani": 0,
-                "notlar": "Görsel boyut hatası"
-            }
-        
-        except json.JSONDecodeError as e:
-            return {
-                "ticari_ad": "Bilinmiyor",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "barkod": "",
-                "error": f"JSON parse hatası: {str(e)}",
-                "error_type": "JSONDecodeError",
-                "user_message": "AI yanıtı işlenemedi. Lütfen tekrar deneyin.",
-                "guven_puani": 0,
-                "notlar": "JSON parse hatası"
-            }
-        
-        except Exception as e:
-            error_msg = str(e)
-            user_friendly_msg = "Görsel analizi başarısız oldu"
-            
-            # Detaylı hata loglama
-            print(f"❌ VisionAgent Hatası: {error_msg}")
-            print(f"   Hata Tipi: {type(e).__name__}")
-            
-            # Özel hata mesajları
-            if "401" in error_msg or "invalid_api_key" in error_msg.lower():
-                user_friendly_msg = "Groq API anahtarı geçersiz"
-            elif "429" in error_msg or "rate_limit" in error_msg.lower():
-                if "tokens per day" in error_msg.lower() or "tpd" in error_msg.lower():
-                    user_friendly_msg = "Günlük token limiti doldu. Yarın tekrar deneyin."
-                else:
-                    user_friendly_msg = "Dakikalık API limiti aşıldı. 1-2 dakika bekleyin."
-            elif "timeout" in error_msg.lower():
-                user_friendly_msg = "İstek zaman aşımına uğradı. Lütfen tekrar deneyin."
-            elif "connection" in error_msg.lower() or "network" in error_msg.lower():
-                user_friendly_msg = "İnternet bağlantısı sorunu. Bağlantınızı kontrol edin."
-            elif "model_decommissioned" in error_msg.lower():
-                user_friendly_msg = "Model kullanımdan kaldırıldı. Sistem güncellemesi gerekiyor."
-            elif "content_policy" in error_msg.lower() or "safety" in error_msg.lower():
-                user_friendly_msg = "Görsel güvenlik filtresine takıldı. Farklı bir görsel deneyin."
+                user_friendly_msg = "Groq API limiti aşıldı. Birkaç dakika bekleyin."
             
             return {
                 "ticari_ad": "Bilinmiyor",
@@ -713,13 +554,13 @@ Sorun devam ederse: https://github.com/groq/groq-python/issues
 
 
 class PharmaGuardOrchestrator:
-    """Ana orkestratör - Groq (Orkestra) + LLaVA (Vision) + RAG"""
+    """Ana orkestratör - Groq (Orkestra + OCR Analiz) + RAG"""
     
-    def __init__(self, groq_key: str, replicate_token: str = None):
+    def __init__(self, groq_key: str):
         self.groq_client = Groq(api_key=groq_key)
         
-        # LLaVA Vision Agent
-        self.vision_agent = VisionAgent(replicate_token)
+        # OCR Vision Agent
+        self.vision_agent = VisionAgent(self.groq_client)
             
         self.rag_agent = RAGAgent(groq_client=self.groq_client)
         self.safety_auditor = SafetyAuditor(groq_key)

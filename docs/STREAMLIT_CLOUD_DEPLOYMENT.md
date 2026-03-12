@@ -48,12 +48,12 @@ git push -u origin main
 
 ```toml
 GROQ_API_KEY = "your_groq_api_key_here"
-GEMINI_API_KEY = "your_gemini_api_key_here"
 ```
 
-**API Anahtarlarınızı Buraya Girin:**
+**API Anahtarınızı Buraya Girin:**
 - Groq: https://console.groq.com
-- Gemini: https://aistudio.google.com
+
+**NOT:** Artık sadece Groq API gerekiyor! Tesseract OCR lokal olarak çalışır.
 
 ### Adım 4: Deploy
 
@@ -138,9 +138,10 @@ def initialize_db(self):
 - [ ] `packages.txt` oluşturuldu
 - [ ] `.streamlit/config.toml` oluşturuldu
 - [ ] Streamlit Cloud'da app oluşturuldu
-- [ ] Secrets yapılandırıldı (GROQ_API_KEY, GEMINI_API_KEY)
+- [ ] Secrets yapılandırıldı (GROQ_API_KEY)
 - [ ] Deploy tamamlandı
 - [ ] App test edildi
+- [ ] OCR çalışıyor mu test edildi
 
 ## 🎯 Optimizasyon İpuçları
 

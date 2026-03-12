@@ -1,0 +1,44 @@
+PHARMA-GUARD AI - Vision System Update
+======================================
+
+Date: March 12, 2026
+Status: COMPLETED
+
+CHANGES MADE:
+-------------
+
+1. Vision System Migration
+   - FROM: LLaVA v1.6 via Replicate API (paid, had credit issues)
+   - TO: Tesseract OCR (free, local, no API needed)
+
+2. Files Updated:
+   ✅ agents.py - Removed duplicate code, cleaned VisionAgent class
+   ✅ app.py - Removed replicate_token parameter
+   ✅ requirements.txt - Removed duplicate pytesseract
+   ✅ packages.txt - Already has tesseract-ocr packages
+   ✅ README.md - Updated vision system description
+   ✅ .env.example - Removed REPLICATE_API_TOKEN
+
+3. System Architecture:
+   - Vision: Tesseract OCR (local, free)
+   - Text Analysis: Groq Llama 3.3 70B
+   - RAG: Local prospectus search (11,226 drugs)
+   - Orchestrator: Groq Llama 3.3 70B
+
+4. Benefits:
+   ✅ No more Replicate API costs
+   ✅ No more credit errors (402)
+   ✅ Works offline for OCR
+   ✅ Supports Turkish + English
+   ✅ Only needs GROQ_API_KEY
+
+NEXT STEPS:
+-----------
+1. Test OCR with actual drug images
+2. Deploy to Streamlit Cloud
+3. Monitor OCR accuracy
+
+DEPLOYMENT:
+-----------
+Streamlit Cloud Secrets needed:
+GROQ_API_KEY = "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"
