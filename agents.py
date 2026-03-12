@@ -205,12 +205,24 @@ Sadece JSON formatında yanıt ver."""
                 "guven_puani": 0,
                 "notlar": user_friendly_msg
             }
-        """İlaç görselini analiz eder (Groq Llama Vision)"""
+
+
+class RAGAgent:
+    """Basit metin tabanlı prospektüs arama ajanı (ChromaDB olmadan)"""
+    
+    def __init__(self, corpus_path: str = "data/corpus", groq_client: Groq = None):
+        self.corpus_path = corpus_path
+        self.groq_client = groq_client
+        self.prospectus_data = {}
+        # Otomatik olarak yükle
+        self.initialize_db()
+
+        
+    def initialize_db(self):
+        """Metin dosyalarını yükler (basit arama için)"""
         try:
-            import base64
-            
-            # Dosya kontrolü
-            if not os.path.exists(image_path):
+            # Klasör yoksa oluştur
+            if not os.path.exists(self.corpus_path):
                 raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
             
             # Dosya boyutu kontrolü (max 20MB)
