@@ -44,15 +44,15 @@ class VisionAgent:
     
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        # Gemini Pro Vision - Stable and widely available
-        self.model = genai.GenerativeModel('gemini-pro-vision')
+        # Gemini 1.5 Flash - multimodal destekli
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
     
     def analyze_image(self, image_path: str) -> Dict:
         """İlaç görselini analiz eder (Google Gemini Vision)"""
         try:
-            # Görseli yükle
-            with open(image_path, 'rb') as f:
-                image_data = f.read()
+            # Görseli PIL Image olarak yükle
+            from PIL import Image
+            image = Image.open(image_path)
             
             prompt = """
             Bu ilaç kutusunu analiz et ve aşağıdaki bilgileri JSON formatında çıkar:
@@ -70,10 +70,8 @@ class VisionAgent:
             Sadece JSON formatında yanıt ver, başka açıklama ekleme.
             """
             
-            response = self.model.generate_content([
-                prompt,
-                {"mime_type": "image/jpeg", "data": image_data}
-            ])
+            # Gemini 1.5 ile görsel analizi
+            response = self.model.generate_content([prompt, image])
             
             # JSON parse et
             result_text = response.text.strip()
