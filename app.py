@@ -205,6 +205,33 @@ def main():
                     except Exception as e:
                         st.error(f"❌ Hata oluştu: {str(e)}")
                         
+                        # Rate limit kontrolü
+                        if "429" in str(e) or "rate_limit" in str(e).lower():
+                            if "tokens per day" in str(e).lower() or "tpd" in str(e).lower():
+                                st.warning("""
+                                ### ⏱️ GÜNLÜK TOKEN LİMİTİ DOLDU
+                                
+                                **Sorun:** Groq ücretsiz hesabınızın günlük token limiti (100,000) doldu.
+                                
+                                **Çözümler:**
+                                
+                                1. **Yarın Sabah Deneyin** (Önerilen)
+                                   - Limit her gün sıfırlanır
+                                   - Ücretsiz ve kolay
+                                
+                                2. **Groq Pro'ya Geçin** (Hemen kullanmak için)
+                                   - https://console.groq.com/settings/billing
+                                   - Ücretli ama limitsiz
+                                """)
+                            else:
+                                st.warning("""
+                                ### ⏱️ DAKİKALIK LİMİT AŞILDI
+                                
+                                **Sorun:** Dakikada 30 istek limiti aşıldı.
+                                
+                                **Çözüm:** 1-2 dakika bekleyin ve tekrar deneyin.
+                                """)
+                        
                         with st.expander("🔍 Detaylı Hata Bilgisi (Geliştiriciler için)"):
                             st.code(f"Hata Tipi: {type(e).__name__}")
                             st.code(f"Hata Mesajı: {str(e)}")

@@ -2,6 +2,34 @@
 
 Tüm önemli değişiklikler bu dosyada belgelenecektir.
 
+## [2.1.0] - 2026-03-12
+
+### ✨ Eklenenler
+- Rate limit optimizasyonları (koşullu RAG ve Safety audit)
+- Detaylı hata mesajları ve kullanıcı dostu uyarılar
+- Günlük token limiti kontrolü ve bilgilendirme
+
+### 🔧 İyileştirmeler
+- Hata yakalama mekanizması iyileştirildi
+- API limit aşımı durumunda kısmi rapor gösterimi
+- Görsel analiz başarısızsa RAG atlanıyor (token tasarrufu)
+- Güven puanı düşükse güvenlik denetimi atlanıyor
+
+### 🗑️ Kaldırılanlar
+- Demo modu referansları ana uygulamadan çıkarıldı
+- Gereksiz test dosyaları ve görseller silindi
+- Kullanılmayan dokümantasyon dosyaları (RATE_LIMIT_FIX.md, FINAL_FIX.md, vb.)
+- agents_optimized.py (henüz entegre edilmemiş)
+- prospektus_olusturucu.py (veritabanı zaten hazır)
+- app_simple.py (kullanılmıyor)
+
+### 📦 Proje Temizliği
+- 15 gereksiz dosya silindi
+- Proje yapısı sadeleştirildi
+- README güncellendigereksiz referanslar kaldırıldı
+
+---
+
 ## [2.0.0] - 2026-03-12
 
 ### ✨ Eklenenler

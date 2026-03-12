@@ -133,13 +133,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 Detaylı talimatlar için `API_ANAHTARI_NASIL_ALINIR.md` ve `GEMINI_API_NASIL_ALINIR.txt` dosyalarına bakın.
 
-### Adım 4: Prospektüs Veritabanını Oluşturun (Opsiyonel)
+### Adım 4: Sistemi Başlatın
 
-Veritabanı zaten 11,000+ ilaç ile hazır. Yeniden oluşturmak isterseniz:
-
-```bash
-python prospektus_olusturucu.py
-```
+Veritabanı zaten 11,226 ilaç ile hazır. Hemen kullanmaya başlayabilirsiniz!
 
 ---
 
@@ -155,16 +151,6 @@ GERCEK_SISTEM_BASLAT.bat
 
 ```bash
 streamlit run app.py
-```
-
-### Demo Modu (API Anahtarı Olmadan)
-
-```bash
-DEMO_BASLAT.bat
-```
-veya
-```bash
-streamlit run app_demo.py
 ```
 
 ### Kullanım Adımları
@@ -210,13 +196,7 @@ streamlit run app_demo.py
 
 ### Veritabanı Yönetimi
 
-Yeni prospektüs eklemek için:
-
-```bash
-python prospektus_olusturucu.py
-```
-
-Prospektüsler `data/corpus/` klasöründe TXT formatında saklanır.
+Prospektüsler `data/corpus/` klasöründe TXT formatında saklanır. Veritabanı 11,226 ilaç ile hazır durumda.
 
 ---
 
@@ -254,30 +234,38 @@ GEMINI_API_KEY = "your_gemini_key"
 ```
 pharma-guard-ai/
 ├── 📄 app.py                          # Ana uygulama
-├── 📄 app_demo.py                     # Demo modu (API'siz)
 ├── 📄 agents.py                       # AI ajanları (Vision, RAG, Security)
 ├── 📄 utils.py                        # Yardımcı fonksiyonlar
-├── 📄 prospektus_olusturucu.py       # Prospektüs oluşturucu
 ├── 📄 requirements.txt                # Python bağımlılıkları
+├── 📄 runtime.txt                     # Python versiyonu (Streamlit Cloud)
+├── 📄 packages.txt                    # Sistem bağımlılıkları
 ├── 📄 .env.example                    # Örnek ortam değişkenleri
 ├── 📄 .gitignore                      # Git ignore kuralları
+├── 📄 START.bat                       # Windows başlatma scripti
 │
 ├── 📁 data/
-│   └── 📁 corpus/                     # 11,280 prospektüs dosyası
+│   └── 📁 corpus/                     # 11,226 ilaç prospektüsü
 │
 ├── 📁 reports/                        # Analiz raporları
 ├── 📁 uploads/                        # Yüklenen görseller
 │
 ├── 📁 .streamlit/
-│   └── 📄 secrets.toml                # Streamlit secrets
+│   ├── 📄 config.toml                 # Streamlit yapılandırması
+│   └── 📄 secrets.toml                # API anahtarları
 │
 ├── 📁 docs/                           # Dokümantasyon
-│   ├── 📄 KURULUM.md                  # Detaylı kurulum
-│   ├── 📄 HATA_COZUMLERI.md          # Sorun giderme
-│   ├── 📄 HIZLI_BASLANGIC.md         # Hızlı başlangıç
+│   ├── 📄 KURULUM.md
+│   ├── 📄 HATA_COZUMLERI.md
+│   ├── 📄 HIZLI_BASLANGIC.md
 │   ├── 📄 API_ANAHTARI_NASIL_ALINIR.md
 │   ├── 📄 GEMINI_API_NASIL_ALINIR.txt
-│   └── 📄 DEMO_NASIL_KULLANILIR.md
+│   ├── 📄 DEMO_NASIL_KULLANILIR.md
+│   └── 📄 STREAMLIT_CLOUD_DEPLOYMENT.md
+│
+└── 📁 scripts/                        # Yardımcı scriptler
+    ├── 📄 GERCEK_SISTEM_BASLAT.bat
+    └── 📄 TEMIZ_BASLATMA.bat
+```
 │
 └── 📁 scripts/                        # Yardımcı scriptler
     ├── 📄 GERCEK_SISTEM_BASLAT.bat
