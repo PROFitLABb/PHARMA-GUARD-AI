@@ -44,7 +44,8 @@ class VisionAgent:
     
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # Gemini Pro Vision - Stable and widely available
+        self.model = genai.GenerativeModel('gemini-pro-vision')
     
     def analyze_image(self, image_path: str) -> Dict:
         """İlaç görselini analiz eder (Google Gemini Vision)"""

@@ -216,7 +216,7 @@ GROQ_API_KEY=gsk_your_api_key_here
 GEMINI_API_KEY=AIzaSy_your_api_key_here
 ```
 
-**Model**: gemini-2.5-flash
+**Model**: gemini-pro-vision
 
 ### Streamlit Secrets (Alternatif)
 
