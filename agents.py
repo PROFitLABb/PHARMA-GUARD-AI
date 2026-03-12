@@ -91,6 +91,11 @@ class VisionAgent:
                 user_friendly_msg = "Gemini API limit aşıldı. Lütfen birkaç dakika bekleyin."
             
             return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
                 "error": error_msg,
                 "user_message": user_friendly_msg,
                 "guven_puani": 0,

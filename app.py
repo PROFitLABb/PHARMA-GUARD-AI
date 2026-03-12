@@ -120,12 +120,12 @@ def main():
             st.success("✅ Groq API: Aktif")
         else:
             st.error("❌ Groq API: Bulunamadı")
-            st.info("Lütfen `.env` veya `.streamlit/secrets.toml` dosyasına GROQ_API_KEY ekleyin")
+            st.info("Lütfen `.env` veya Streamlit Secrets'a GROQ_API_KEY ekleyin")
         
         if gemini_key and gemini_key != "your_gemini_api_key_here":
             st.success("✅ Gemini API: Aktif")
         else:
-            st.warning("⚠️ Gemini API: Yok (Simülasyon modu)")
+            st.warning("⚠️ Gemini API: Yok (Groq Vision kullanılacak)")
         
         st.divider()
         
@@ -152,13 +152,16 @@ def main():
     if not groq_key:
         st.error("⚠️ GROQ_API_KEY bulunamadı! Lütfen API anahtarınızı yapılandırın.")
         st.info("""
-        **Hızlı Çözüm:**
-        1. https://console.groq.com → API Keys
-        2. Yeni anahtar oluştur
-        3. `.env` veya `.streamlit/secrets.toml` dosyasına ekle
-        4. Sayfayı yenile
+        **Streamlit Cloud için:**
+        1. App settings → Secrets
+        2. Şunu ekleyin:
+        ```
+        GROQ_API_KEY = "your_key_here"
+        GEMINI_API_KEY = "your_key_here"
+        ```
+        3. Save ve Reboot
         """)
-        return
+        st.stop()  # Burada dur
     
     # Sistemi başlat
     create_data_directories()
@@ -185,24 +188,42 @@ def main():
                 if st.button("🔬 Analizi Başlat", type="primary", use_container_width=True):
                     with st.spinner("Çoklu ajan sistemi çalışıyor..."):
                         try:
+                            # Debug: Klasörleri kontrol et
+                            st.info("📁 Klasörler kontrol ediliyor...")
+                            os.makedirs("uploads", exist_ok=True)
+                            os.makedirs("reports", exist_ok=True)
+                            os.makedirs("data/corpus", exist_ok=True)
+                            
                             # Dosyayı kaydet
+                            st.info("💾 Görsel kaydediliyor...")
                             temp_path = os.path.join("uploads", uploaded_file.name)
                             with open(temp_path, "wb") as f:
                                 f.write(uploaded_file.getbuffer())
                             
+                            st.success(f"✅ Görsel kaydedildi: {temp_path}")
+                            
                             # Görsel doğrulama
+                            st.info("🔍 Görsel doğrulanıyor...")
                             if not validate_image(temp_path):
                                 st.error("❌ Geçersiz görsel dosyası!")
                                 return
                             
+                            st.success("✅ Görsel doğrulandı")
+                            
                             # Boyutlandır
+                            st.info("📐 Görsel boyutlandırılıyor...")
                             resized_path = resize_image(temp_path)
+                            st.success(f"✅ Görsel boyutlandırıldı: {resized_path}")
                             
                             # Orchestrator oluştur
+                            st.info("🤖 AI sistemi başlatılıyor...")
                             orchestrator = PharmaGuardOrchestrator(groq_key, gemini_key)
+                            st.success("✅ AI sistemi hazır")
                             
                             # Analiz et
+                            st.info("🔬 Analiz yapılıyor...")
                             results = orchestrator.analyze_drug(resized_path)
+                            st.success("✅ Analiz tamamlandı")
                             
                             # Hata kontrolü
                             vision_data = results.get("vision", {})
