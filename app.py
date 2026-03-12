@@ -166,13 +166,60 @@ def main():
                         # Hata kontrolü
                         vision_data = results.get("vision", {})
                         if "error" in vision_data:
-                            st.warning(f"⚠️ Görsel analiz uyarısı: {vision_data.get('user_message', 'Bilinmeyen')}")
+                            error_type = vision_data.get('error_type', 'Unknown')
+                            user_msg = vision_data.get('user_message', 'Bilinmeyen hata')
+                            
+                            # Hata tipine göre uyarı seviyesi
+                            if error_type in ["FileNotFoundError", "ValueError"]:
+                                st.error(f"❌ {user_msg}")
+                            elif "rate_limit" in vision_data.get('error', '').lower():
+                                st.warning(f"⏱️ {user_msg}")
+                            else:
+                                st.warning(f"⚠️ Görsel analiz uyarısı: {user_msg}")
                             
                             # Detaylı hata bilgisi
                             with st.expander("🔍 Teknik Detaylar (Geliştiriciler için)"):
-                                st.code(f"Hata Tipi: {vision_data.get('error_type', 'Unknown')}")
+                                st.code(f"Hata Tipi: {error_type}")
                                 st.code(f"Hata Mesajı: {vision_data.get('error', 'Unknown')}")
-                                st.info("Bu bilgileri Streamlit Cloud loglarında da görebilirsiniz.")
+                                
+                                # Çözüm önerileri
+                                if "rate_limit" in vision_data.get('error', '').lower():
+                                    if "tokens per day" in vision_data.get('error', '').lower():
+                                        st.info("""
+                                        **Çözüm:**
+                                        - Groq günlük token limiti (100,000) doldu
+                                        - Yarın sabah otomatik sıfırlanır
+                                        - Acil kullanım için Groq Pro'ya geçin: https://console.groq.com/settings/billing
+                                        """)
+                                    else:
+                                        st.info("""
+                                        **Çözüm:**
+                                        - Dakikalık limit (30 istek) aşıldı
+                                        - 1-2 dakika bekleyin ve tekrar deneyin
+                                        """)
+                                elif "401" in vision_data.get('error', ''):
+                                    st.info("""
+                                    **Çözüm:**
+                                    - API anahtarınız geçersiz
+                                    - Yeni anahtar alın: https://console.groq.com
+                                    - Streamlit Cloud Secrets'ı güncelleyin
+                                    """)
+                                elif "timeout" in vision_data.get('error', '').lower():
+                                    st.info("""
+                                    **Çözüm:**
+                                    - İstek zaman aşımına uğradı
+                                    - Daha küçük bir görsel deneyin
+                                    - İnternet bağlantınızı kontrol edin
+                                    """)
+                                elif "model_decommissioned" in vision_data.get('error', '').lower():
+                                    st.error("""
+                                    **Kritik:**
+                                    - Kullanılan AI modeli kullanımdan kaldırıldı
+                                    - Sistem güncellemesi gerekiyor
+                                    - Lütfen geliştiriciyle iletişime geçin
+                                    """)
+                                else:
+                                    st.info("Sorun devam ederse lütfen farklı bir görsel deneyin.")
                         
                         # Güven puanı
                         confidence = calculate_confidence_score(results)

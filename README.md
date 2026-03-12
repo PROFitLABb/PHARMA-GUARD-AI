@@ -44,7 +44,7 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## ✨ Özellikler
 
 ### 🔍 Görsel Analiz
-- **Groq Llama 3.2 Vision (90B)** ile ilaç kutusu tanıma
+- **Groq Llama 3.2 Vision (11B)** ile ilaç kutusu tanıma
 - İlaç adı, etken madde, dozaj ve form tespiti
 - Yüksek doğruluk oranı (8-9/10 güven puanı)
 
@@ -77,7 +77,7 @@ Bu sistem **eğitim ve bilgilendirme amaçlıdır**. Gerçek tıbbi kararlar iç
 ## 🛠️ Teknoloji Stack
 
 ### AI & ML
-- **Groq Llama 3.2 Vision (90B)** - Görsel analiz
+- **Groq Llama 3.2 Vision (11B)** - Görsel analiz
 - **Groq Llama 3.3 70B** - Metin analizi ve RAG
 - **RAG (Retrieval-Augmented Generation)** - Prospektüs arama
 
@@ -206,7 +206,7 @@ GROQ_API_KEY=gsk_your_api_key_here
 ```
 
 **Modeller**: 
-- llama-3.2-90b-vision-preview (Görsel analiz)
+- llama-3.2-11b-vision-preview (Görsel analiz)
 - llama-3.3-70b-versatile (Metin analiz)
 
 ### Streamlit Secrets (Alternatif)

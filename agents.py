@@ -49,6 +49,15 @@ class VisionAgent:
         try:
             import base64
             
+            # Dosya kontrolü
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Görsel dosyası bulunamadı: {image_path}")
+            
+            # Dosya boyutu kontrolü (max 20MB)
+            file_size = os.path.getsize(image_path)
+            if file_size > 20 * 1024 * 1024:
+                raise ValueError(f"Görsel çok büyük ({file_size / 1024 / 1024:.1f}MB). Maksimum 20MB olmalı.")
+            
             # Görseli base64'e çevir
             with open(image_path, 'rb') as f:
                 image_data = base64.b64encode(f.read()).decode('utf-8')
@@ -69,9 +78,9 @@ class VisionAgent:
             Sadece JSON formatında yanıt ver, başka açıklama ekleme.
             """
             
-            # Groq Llama 3.2 Vision
+            # Groq Llama 3.2 Vision (11B)
             response = self.client.chat.completions.create(
-                model="llama-3.2-90b-vision-preview",
+                model="llama-3.2-11b-vision-preview",
                 messages=[
                     {
                         "role": "user",
@@ -87,7 +96,8 @@ class VisionAgent:
                     }
                 ],
                 temperature=0.1,
-                max_tokens=1024
+                max_tokens=1024,
+                timeout=30  # 30 saniye timeout
             )
             
             # JSON parse et
@@ -95,8 +105,58 @@ class VisionAgent:
             if "```json" in result_text:
                 result_text = result_text.split("```json")[1].split("```")[0].strip()
             
-            return json.loads(result_text)
+            parsed_result = json.loads(result_text)
             
+            # Zorunlu alanları kontrol et
+            required_fields = ["ticari_ad", "etken_madde", "dozaj", "form", "guven_puani"]
+            for field in required_fields:
+                if field not in parsed_result:
+                    parsed_result[field] = "Bilinmiyor" if field != "guven_puani" else 0
+            
+            return parsed_result
+            
+        except FileNotFoundError as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": str(e),
+                "error_type": "FileNotFoundError",
+                "user_message": "Görsel dosyası bulunamadı",
+                "guven_puani": 0,
+                "notlar": "Dosya yükleme hatası"
+            }
+        
+        except ValueError as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": str(e),
+                "error_type": "ValueError",
+                "user_message": str(e),
+                "guven_puani": 0,
+                "notlar": "Görsel boyut hatası"
+            }
+        
+        except json.JSONDecodeError as e:
+            return {
+                "ticari_ad": "Bilinmiyor",
+                "etken_madde": "Bilinmiyor",
+                "dozaj": "Bilinmiyor",
+                "form": "Bilinmiyor",
+                "barkod": "",
+                "error": f"JSON parse hatası: {str(e)}",
+                "error_type": "JSONDecodeError",
+                "user_message": "AI yanıtı işlenemedi. Lütfen tekrar deneyin.",
+                "guven_puani": 0,
+                "notlar": "JSON parse hatası"
+            }
+        
         except Exception as e:
             error_msg = str(e)
             user_friendly_msg = "Görsel analizi başarısız oldu"
@@ -105,13 +165,21 @@ class VisionAgent:
             print(f"❌ VisionAgent Hatası: {error_msg}")
             print(f"   Hata Tipi: {type(e).__name__}")
             
-            if "API_KEY_INVALID" in error_msg or "invalid" in error_msg.lower():
-                user_friendly_msg = "Gemini API anahtarı geçersiz. Lütfen yeni bir anahtar alın: https://makersuite.google.com/app/apikey"
-            elif "RESOURCE_EXHAUSTED" in error_msg or "quota" in error_msg.lower():
-                user_friendly_msg = "Gemini API limit aşıldı. Lütfen birkaç dakika bekleyin."
-            elif "PERMISSION_DENIED" in error_msg or "permission" in error_msg.lower():
-                user_friendly_msg = "Gemini API izin hatası. API anahtarınızı kontrol edin."
-            elif "SAFETY" in error_msg or "blocked" in error_msg.lower():
+            # Özel hata mesajları
+            if "401" in error_msg or "invalid_api_key" in error_msg.lower():
+                user_friendly_msg = "Groq API anahtarı geçersiz"
+            elif "429" in error_msg or "rate_limit" in error_msg.lower():
+                if "tokens per day" in error_msg.lower() or "tpd" in error_msg.lower():
+                    user_friendly_msg = "Günlük token limiti doldu. Yarın tekrar deneyin."
+                else:
+                    user_friendly_msg = "Dakikalık API limiti aşıldı. 1-2 dakika bekleyin."
+            elif "timeout" in error_msg.lower():
+                user_friendly_msg = "İstek zaman aşımına uğradı. Lütfen tekrar deneyin."
+            elif "connection" in error_msg.lower() or "network" in error_msg.lower():
+                user_friendly_msg = "İnternet bağlantısı sorunu. Bağlantınızı kontrol edin."
+            elif "model_decommissioned" in error_msg.lower():
+                user_friendly_msg = "Model kullanımdan kaldırıldı. Sistem güncellemesi gerekiyor."
+            elif "content_policy" in error_msg.lower() or "safety" in error_msg.lower():
                 user_friendly_msg = "Görsel güvenlik filtresine takıldı. Farklı bir görsel deneyin."
             
             return {
