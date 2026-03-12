@@ -33,23 +33,20 @@ st.markdown("""
 def load_api_keys():
     """API anahtarlarını yükler"""
     groq_key = None
-    gemini_key = None
     
     try:
         # 1. Streamlit secrets
         if hasattr(st, 'secrets'):
             groq_key = st.secrets.get('GROQ_API_KEY')
-            gemini_key = st.secrets.get('GEMINI_API_KEY') or st.secrets.get('GOOGLE_API_KEY')
     except:
         pass
     
     # 2. Environment
-    if not groq_key or not gemini_key:
+    if not groq_key:
         load_dotenv()
-        groq_key = groq_key or os.getenv("GROQ_API_KEY")
-        gemini_key = gemini_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        groq_key = os.getenv("GROQ_API_KEY")
     
-    return groq_key, gemini_key
+    return groq_key
 
 
 def main():
@@ -60,7 +57,7 @@ def main():
     st.markdown('<p style="text-align: center; color: #666;">Yapay Zeka Destekli Akıllı İlaç Denetçisi</p>', unsafe_allow_html=True)
     
     # API anahtarlarını yükle
-    groq_key, gemini_key = load_api_keys()
+    groq_key = load_api_keys()
     
     # Sidebar
     with st.sidebar:
@@ -68,21 +65,19 @@ def main():
         
         if groq_key:
             st.success("✅ Groq API: Aktif")
+            st.info("🔍 Groq Llama Vision kullanılıyor")
         else:
             st.error("❌ Groq API: Yok")
-        
-        if gemini_key and gemini_key != "your_gemini_api_key_here":
-            st.success("✅ Gemini API: Aktif")
-        else:
-            st.warning("⚠️ Gemini API: Yok")
         
         st.divider()
         st.info("""
         **Aktif Ajanlar:**
-        - 🔍 Vision Scanner
+        - 🔍 Vision Scanner (Llama 3.2)
         - 📚 RAG Specialist
         - ⚠️ Safety Auditor
         - 📊 Report Synthesizer
+        
+        **Tek API:** Groq
         """)
     
     # API key kontrolü
@@ -96,7 +91,6 @@ def main():
         
         ```
         GROQ_API_KEY = "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"
-        GEMINI_API_KEY = "AIzaSyB9VMJ926k-yBaqPRQdMCYh4WYDmE2QR4A"
         ```
         
         3. Save → App yeniden başlayacak
@@ -158,7 +152,7 @@ def main():
                         
                         # AI Sistemi
                         st.info("🤖 AI sistemi başlatılıyor...")
-                        orchestrator = PharmaGuardOrchestrator(groq_key, gemini_key)
+                        orchestrator = PharmaGuardOrchestrator(groq_key)
                         st.success("✅ AI sistemi hazır")
                         
                         # Analiz

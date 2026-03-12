@@ -1,6 +1,6 @@
 """
-PHARMA-GUARD Multi-Agent System (Groq + Gemini Vision)
-Groq: Metin analizi, Gemini: Görsel analizi
+PHARMA-GUARD Multi-Agent System (Groq Llama Vision)
+Tek API ile hem görsel hem metin analizi
 """
 
 import os
@@ -8,7 +8,6 @@ import json
 import base64
 from typing import Dict, List, Optional
 from groq import Groq
-import google.generativeai as genai
 
 # Master System Prompt
 MASTER_PROMPT = """
@@ -40,19 +39,19 @@ AŞAĞIDAKİ 5 ALT AJANI AYNI ANDA KOORDİNE ET:
 
 
 class VisionAgent:
-    """Görsel analiz ajanı - Google Gemini Vision ile ilaç kutusunu tarar"""
+    """Görsel analiz ajanı - Groq Llama Vision ile ilaç kutusunu tarar"""
     
-    def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        # Gemini 2.0 Flash - En yeni model
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    def __init__(self, groq_client):
+        self.client = groq_client
     
     def analyze_image(self, image_path: str) -> Dict:
-        """İlaç görselini analiz eder (Google Gemini Vision)"""
+        """İlaç görselini analiz eder (Groq Llama Vision)"""
         try:
-            # Görseli PIL Image olarak yükle
-            from PIL import Image
-            image = Image.open(image_path)
+            import base64
+            
+            # Görseli base64'e çevir
+            with open(image_path, 'rb') as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
             
             prompt = """
             Bu ilaç kutusunu analiz et ve aşağıdaki bilgileri JSON formatında çıkar:
@@ -70,11 +69,29 @@ class VisionAgent:
             Sadece JSON formatında yanıt ver, başka açıklama ekleme.
             """
             
-            # Gemini 1.5 ile görsel analizi
-            response = self.model.generate_content([prompt, image])
+            # Groq Llama 3.2 Vision
+            response = self.client.chat.completions.create(
+                model="llama-3.2-90b-vision-preview",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_data}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                temperature=0.1,
+                max_tokens=1024
+            )
             
             # JSON parse et
-            result_text = response.text.strip()
+            result_text = response.choices[0].message.content.strip()
             if "```json" in result_text:
                 result_text = result_text.split("```json")[1].split("```")[0].strip()
             
@@ -456,50 +473,38 @@ Sorun devam ederse: https://github.com/groq/groq-python/issues
 
 
 class PharmaGuardOrchestrator:
-    """Ana orkestratör - Tüm ajanları koordine eder (Gemini Vision + Groq)"""
+    """Ana orkestratör - Tüm ajanları koordine eder (Groq Llama Vision)"""
     
-    def __init__(self, groq_key: str, gemini_key: str = None):
+    def __init__(self, groq_key: str):
         self.groq_client = Groq(api_key=groq_key)
         
-        # Gemini varsa kullan, yoksa Groq ile devam et
-        if gemini_key:
-            self.vision_agent = VisionAgent(gemini_key)
-        else:
-            # Fallback: Groq ile simüle et
-            self.vision_agent = None
+        # Groq Llama Vision kullan
+        self.vision_agent = VisionAgent(self.groq_client)
             
         self.rag_agent = RAGAgent(groq_client=self.groq_client)
         self.safety_auditor = SafetyAuditor(groq_key)
         self.report_synthesizer = ReportSynthesizer(groq_key)
     
     def analyze_drug(self, image_path: str) -> Dict:
-        """Tam ilaç analizi pipeline'ı - Rate limit optimized"""
+        """Tam ilaç analizi pipeline'ı - Groq Llama Vision"""
         
         try:
-            # 1. Görsel Analiz
-            if self.vision_agent:
-                try:
-                    vision_result = self.vision_agent.analyze_image(image_path)
-                except Exception as vision_error:
-                    print(f"⚠️ Görsel analiz hatası: {vision_error}")
-                    vision_result = {
-                        "ticari_ad": "Görsel analizi başarısız",
-                        "etken_madde": "Bilinmiyor",
-                        "dozaj": "Bilinmiyor",
-                        "form": "Bilinmiyor",
-                        "guven_puani": 0,
-                        "error": "VISION_ERROR",
-                        "error_detail": str(vision_error),
-                        "notlar": f"Görsel analiz hatası: {str(vision_error)}"
-                    }
-            else:
+            # 1. Görsel Analiz (Groq Llama Vision)
+            try:
+                vision_result = self.vision_agent.analyze_image(image_path)
+            except Exception as vision_error:
+                print(f"⚠️ Görsel analiz hatası: {vision_error}")
                 vision_result = {
-                    "ticari_ad": "Görsel analizi yapılamadı",
+                    "ticari_ad": "Görsel analizi başarısız",
                     "etken_madde": "Bilinmiyor",
                     "dozaj": "Bilinmiyor",
                     "form": "Bilinmiyor",
                     "guven_puani": 0,
-                    "notlar": "Gemini API anahtarı bulunamadı."
+                    "error": "VISION_ERROR",
+                    "error_detail": str(vision_error),
+                    "error_type": type(vision_error).__name__,
+                    "user_message": "Groq Llama Vision analizi başarısız oldu",
+                    "notlar": f"Görsel analiz hatası: {str(vision_error)}"
                 }
             
             # 2. RAG Arama - SADECE görsel analiz başarılıysa

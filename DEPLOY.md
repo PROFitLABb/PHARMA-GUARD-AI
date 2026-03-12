@@ -30,8 +30,6 @@ Deploy başladıktan sonra:
 
 ```toml
 GROQ_API_KEY = "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"
-GEMINI_API_KEY = "AIzaSyCmvHFDdEMiEDgN14l298jZ0OVJ3-Du1tk"
-GOOGLE_API_KEY = "AIzaSyCmvHFDdEMiEDgN14l298jZ0OVJ3-Du1tk"
 ```
 
 4. **Save** butonuna basın
