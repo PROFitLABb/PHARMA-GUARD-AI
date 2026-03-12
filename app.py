@@ -173,6 +173,12 @@ def main():
                         vision_data = results.get("vision", {})
                         if "error" in vision_data:
                             st.warning(f"⚠️ Görsel analiz uyarısı: {vision_data.get('user_message', 'Bilinmeyen')}")
+                            
+                            # Detaylı hata bilgisi
+                            with st.expander("🔍 Teknik Detaylar (Geliştiriciler için)"):
+                                st.code(f"Hata Tipi: {vision_data.get('error_type', 'Unknown')}")
+                                st.code(f"Hata Mesajı: {vision_data.get('error', 'Unknown')}")
+                                st.info("Bu bilgileri Streamlit Cloud loglarında da görebilirsiniz.")
                         
                         # Güven puanı
                         confidence = calculate_confidence_score(results)

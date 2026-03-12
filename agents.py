@@ -44,7 +44,7 @@ class VisionAgent:
     
     def __init__(self, api_key: str):
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
     
     def analyze_image(self, image_path: str) -> Dict:
         """İlaç görselini analiz eder (Google Gemini Vision)"""
@@ -85,10 +85,18 @@ class VisionAgent:
             error_msg = str(e)
             user_friendly_msg = "Görsel analizi başarısız oldu"
             
+            # Detaylı hata loglama
+            print(f"❌ VisionAgent Hatası: {error_msg}")
+            print(f"   Hata Tipi: {type(e).__name__}")
+            
             if "API_KEY_INVALID" in error_msg or "invalid" in error_msg.lower():
                 user_friendly_msg = "Gemini API anahtarı geçersiz. Lütfen yeni bir anahtar alın: https://makersuite.google.com/app/apikey"
             elif "RESOURCE_EXHAUSTED" in error_msg or "quota" in error_msg.lower():
                 user_friendly_msg = "Gemini API limit aşıldı. Lütfen birkaç dakika bekleyin."
+            elif "PERMISSION_DENIED" in error_msg or "permission" in error_msg.lower():
+                user_friendly_msg = "Gemini API izin hatası. API anahtarınızı kontrol edin."
+            elif "SAFETY" in error_msg or "blocked" in error_msg.lower():
+                user_friendly_msg = "Görsel güvenlik filtresine takıldı. Farklı bir görsel deneyin."
             
             return {
                 "ticari_ad": "Bilinmiyor",
@@ -97,6 +105,7 @@ class VisionAgent:
                 "form": "Bilinmiyor",
                 "barkod": "",
                 "error": error_msg,
+                "error_type": type(e).__name__,
                 "user_message": user_friendly_msg,
                 "guven_puani": 0,
                 "notlar": user_friendly_msg
