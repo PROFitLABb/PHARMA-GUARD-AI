@@ -109,22 +109,31 @@ class VisionAgent:
             
             # Groq ile metni analiz et
             prompt = f"""
-            Aşağıdaki metin bir ilaç kutusundan OCR ile çıkarılmıştır. 
+            Sen bir ilaç tanıma uzmanısın. Aşağıdaki metin bir ilaç kutusundan OCR ile çıkarılmıştır. 
+            OCR hataları olabilir (örn: "soo" → "500", "O" → "0").
+            
             Bu metinden ilaç bilgilerini çıkar ve JSON formatında ver:
             
-            METIN:
+            OCR METNİ:
             {extracted_text[:1000]}
             
-            JSON FORMAT:
+            KURALLAR:
+            1. İlaç adını düzelt (örn: "Parol soo" → "Parol 500")
+            2. Sayıları düzelt (örn: "soo" → "500", "O" → "0")
+            3. Türkçe ilaç adlarını tanı (Parol, Aspirin, Majezik, vb.)
+            4. Dozajı mg/ml olarak belirt
+            5. Güven puanı: 1-10 arası SAYI (string değil!)
+            
+            JSON FORMAT (SADECE JSON, BAŞKA BİR ŞEY YAZMA):
             {{
-                "ticari_ad": "ilaç adı",
-                "etken_madde": "aktif madde",
-                "dozaj": "mg/ml değeri",
+                "ticari_ad": "düzeltilmiş ilaç adı",
+                "etken_madde": "aktif madde (varsa)",
+                "dozaj": "500mg gibi",
                 "form": "Tablet/Şurup/Kapsül",
-                "guven_puani": 1-10
+                "guven_puani": 7
             }}
             
-            Sadece JSON formatında yanıt ver. Bulamazsan "Bilinmiyor" yaz.
+            Bulamazsan "Bilinmiyor" yaz ama guven_puani her zaman SAYI olmalı!
             """
             
             response = self.groq_client.chat.completions.create(
@@ -144,11 +153,17 @@ class VisionAgent:
             
             parsed_result = json.loads(result_text)
             
-            # Zorunlu alanları kontrol et
+            # Zorunlu alanları kontrol et ve güven puanını integer yap
             required_fields = ["ticari_ad", "etken_madde", "dozaj", "form", "guven_puani"]
             for field in required_fields:
                 if field not in parsed_result:
                     parsed_result[field] = "Bilinmiyor" if field != "guven_puani" else 5
+            
+            # Güven puanını kesinlikle integer yap
+            try:
+                parsed_result["guven_puani"] = int(parsed_result["guven_puani"])
+            except (ValueError, TypeError):
+                parsed_result["guven_puani"] = 5
             
             parsed_result["notlar"] = f"OCR + Groq analizi ({len(extracted_text)} karakter okundu)"
             parsed_result["ocr_text"] = extracted_text[:200]  # İlk 200 karakter
@@ -593,11 +608,19 @@ class PharmaGuardOrchestrator:
             drug_name = vision_result.get("ticari_ad", "")
             # Güven puanını integer'a çevir (string olabilir)
             try:
-                guven_puani = int(vision_result.get("guven_puani", 0))
+                guven_puani_raw = vision_result.get("guven_puani", 0)
+                if isinstance(guven_puani_raw, str):
+                    if guven_puani_raw.lower() == "bilinmiyor":
+                        guven_puani = 0
+                    else:
+                        guven_puani = int(guven_puani_raw)
+                else:
+                    guven_puani = int(guven_puani_raw)
             except (ValueError, TypeError):
                 guven_puani = 0
             
-            if drug_name and drug_name != "Bilinmiyor" and guven_puani > 0:
+            # İlaç adı varsa RAG araması yap (güven puanı düşük olsa bile)
+            if drug_name and drug_name != "Bilinmiyor":
                 try:
                     rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
                 except Exception as rag_error:
@@ -615,14 +638,22 @@ class PharmaGuardOrchestrator:
                     "guven_puani": 0
                 }]
             
-            # 3. Güvenlik Denetimi - SADECE gerekirse
+            # 3. Güvenlik Denetimi - İlaç adı varsa yap
             # Güven puanını integer'a çevir
             try:
-                guven_puani = int(vision_result.get("guven_puani", 0))
+                guven_puani_raw = vision_result.get("guven_puani", 0)
+                if isinstance(guven_puani_raw, str):
+                    if guven_puani_raw.lower() == "bilinmiyor":
+                        guven_puani = 0
+                    else:
+                        guven_puani = int(guven_puani_raw)
+                else:
+                    guven_puani = int(guven_puani_raw)
             except (ValueError, TypeError):
                 guven_puani = 0
             
-            if guven_puani > 3:
+            # İlaç adı varsa güvenlik denetimi yap
+            if drug_name and drug_name != "Bilinmiyor":
                 try:
                     safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
                 except Exception as safety_error:
@@ -633,10 +664,10 @@ class PharmaGuardOrchestrator:
                         "guven_puani": 0
                     }
             else:
-                # Güven puanı düşükse güvenlik denetimini atla
+                # İlaç adı yoksa güvenlik denetimini atla
                 safety_result = {
                     "risk_level": "UNKNOWN",
-                    "warnings": ["Görsel analizi yetersiz, güvenlik denetimi yapılamadı"],
+                    "warnings": ["İlaç adı belirlenemediği için güvenlik denetimi yapılamadı"],
                     "guven_puani": 0
                 }
             
