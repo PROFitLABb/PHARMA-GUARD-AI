@@ -251,7 +251,13 @@ def main():
                             
                         except Exception as e:
                             st.error(f"❌ Analiz sırasında hata oluştu: {str(e)}")
-                            st.exception(e)
+                            
+                            # Detaylı hata bilgisi
+                            with st.expander("🔍 Detaylı Hata Bilgisi"):
+                                st.code(f"Hata Tipi: {type(e).__name__}")
+                                st.code(f"Hata Mesajı: {str(e)}")
+                                import traceback
+                                st.code(traceback.format_exc())
     
     with tab2:
         st.subheader("� Prospektüs Veritabanı")

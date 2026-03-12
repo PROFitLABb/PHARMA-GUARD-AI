@@ -112,15 +112,31 @@ class RAGAgent:
     def initialize_db(self):
         """Metin dosyalarını yükler (basit arama için)"""
         try:
+            # Klasör yoksa oluştur
+            if not os.path.exists(self.corpus_path):
+                os.makedirs(self.corpus_path, exist_ok=True)
+                print(f"⚠️ Prospektüs klasörü oluşturuldu: {self.corpus_path}")
+                return False
+            
             txt_files = [f for f in os.listdir(self.corpus_path) if f.endswith('.txt')]
             
-            for txt_file in txt_files:
-                with open(os.path.join(self.corpus_path, txt_file), 'r', encoding='utf-8') as f:
-                    self.prospectus_data[txt_file] = f.read()
+            if not txt_files:
+                print(f"⚠️ Prospektüs bulunamadı: {self.corpus_path}")
+                return False
             
+            for txt_file in txt_files:
+                try:
+                    with open(os.path.join(self.corpus_path, txt_file), 'r', encoding='utf-8') as f:
+                        self.prospectus_data[txt_file] = f.read()
+                except Exception as file_error:
+                    print(f"⚠️ Dosya okuma hatası ({txt_file}): {file_error}")
+                    continue
+            
+            print(f"✅ {len(self.prospectus_data)} prospektüs yüklendi")
             return len(self.prospectus_data) > 0
+            
         except Exception as e:
-            print(f"Prospektüs yükleme hatası: {e}")
+            print(f"❌ Prospektüs yükleme hatası: {e}")
             return False
     
     def search_prospectus(self, drug_name: str, query: str) -> List[Dict]:
@@ -444,35 +460,86 @@ class PharmaGuardOrchestrator:
         self.report_synthesizer = ReportSynthesizer(groq_key)
     
     def analyze_drug(self, image_path: str) -> Dict:
-        """Tam ilaç analizi pipeline'ı"""
+        """Tam ilaç analizi pipeline'ı - Hata yakalama iyileştirildi"""
         
-        # 1. Görsel Analiz
-        if self.vision_agent:
-            vision_result = self.vision_agent.analyze_image(image_path)
-        else:
-            # Fallback: Simüle et
-            vision_result = {
-                "ticari_ad": "Görsel analizi yapılamadı",
-                "etken_madde": "Bilinmiyor",
-                "dozaj": "Bilinmiyor",
-                "form": "Bilinmiyor",
-                "guven_puani": 0,
-                "notlar": "Gemini API anahtarı bulunamadı. Gerçek görsel analizi için GOOGLE_API_KEY gerekli."
+        try:
+            # 1. Görsel Analiz
+            if self.vision_agent:
+                try:
+                    vision_result = self.vision_agent.analyze_image(image_path)
+                except Exception as vision_error:
+                    print(f"⚠️ Görsel analiz hatası: {vision_error}")
+                    vision_result = {
+                        "ticari_ad": "Görsel analizi başarısız",
+                        "etken_madde": "Bilinmiyor",
+                        "dozaj": "Bilinmiyor",
+                        "form": "Bilinmiyor",
+                        "guven_puani": 0,
+                        "error": "VISION_ERROR",
+                        "error_detail": str(vision_error),
+                        "notlar": f"Görsel analiz hatası: {str(vision_error)}"
+                    }
+            else:
+                # Fallback: Simüle et
+                vision_result = {
+                    "ticari_ad": "Görsel analizi yapılamadı",
+                    "etken_madde": "Bilinmiyor",
+                    "dozaj": "Bilinmiyor",
+                    "form": "Bilinmiyor",
+                    "guven_puani": 0,
+                    "notlar": "Gemini API anahtarı bulunamadı. Gerçek görsel analizi için GEMINI_API_KEY gerekli."
+                }
+            
+            # 2. RAG Arama
+            try:
+                drug_name = vision_result.get("ticari_ad", "Bilinmeyen İlaç")
+                rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
+            except Exception as rag_error:
+                print(f"⚠️ RAG arama hatası: {rag_error}")
+                rag_results = [{
+                    "content": f"Prospektüs araması başarısız: {str(rag_error)}",
+                    "source": "Hata",
+                    "guven_puani": 0
+                }]
+            
+            # 3. Güvenlik Denetimi
+            try:
+                safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
+            except Exception as safety_error:
+                print(f"⚠️ Güvenlik denetimi hatası: {safety_error}")
+                safety_result = {
+                    "risk_level": "UNKNOWN",
+                    "warnings": [f"Güvenlik analizi başarısız: {str(safety_error)}"],
+                    "guven_puani": 0
+                }
+            
+            # 4. Rapor Sentezi
+            try:
+                final_report = self.report_synthesizer.synthesize_report(vision_result, rag_results, safety_result)
+            except Exception as report_error:
+                print(f"⚠️ Rapor sentezi hatası: {report_error}")
+                final_report = f"# Rapor Oluşturulamadı\n\nHata: {str(report_error)}"
+            
+            return {
+                "vision": vision_result,
+                "rag": rag_results,
+                "safety": safety_result,
+                "report": final_report
             }
-        
-        # 2. RAG Arama
-        drug_name = vision_result.get("ticari_ad", "")
-        rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
-        
-        # 3. Güvenlik Denetimi
-        safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
-        
-        # 4. Rapor Sentezi
-        final_report = self.report_synthesizer.synthesize_report(vision_result, rag_results, safety_result)
-        
-        return {
-            "vision": vision_result,
-            "rag": rag_results,
-            "safety": safety_result,
-            "report": final_report
-        }
+            
+        except Exception as e:
+            print(f"❌ Analiz pipeline hatası: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return {
+                "vision": {
+                    "error": "PIPELINE_ERROR",
+                    "error_detail": str(e),
+                    "ticari_ad": "Hata",
+                    "guven_puani": 0
+                },
+                "rag": [{"content": "Analiz başarısız", "source": "Hata", "guven_puani": 0}],
+                "safety": {"risk_level": "UNKNOWN", "warnings": [], "guven_puani": 0},
+                "report": f"# Analiz Başarısız\n\nHata: {str(e)}\n\nLütfen tekrar deneyin veya farklı bir görsel yükleyin."
+            }
