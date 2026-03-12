@@ -1,0 +1,5 @@
+# System dependencies for Streamlit Cloud
+# Image processing libraries
+libjpeg-dev
+zlib1g-dev
+libpng-dev

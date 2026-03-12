@@ -1,8 +1,24 @@
-streamlit==1.32.0
-groq==0.11.0
-httpx==0.27.0
-pillow==10.2.0
-python-dotenv==1.0.1
-fpdf2==2.7.7
-requests==2.31.0
-google-generativeai==0.8.0
+# PHARMA-GUARD AI - Dependencies
+# Python 3.8+ uyumlu
+
+# Web Framework
+streamlit>=1.32.0
+
+# AI/ML APIs
+groq>=0.11.0
+google-generativeai>=0.8.0
+
+# HTTP Client
+httpx>=0.27.0
+
+# Image Processing (Python 3.14 uyumlu)
+pillow>=10.4.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# PDF Generation
+fpdf2>=2.7.0
+
+# HTTP Requests
+requests>=2.31.0

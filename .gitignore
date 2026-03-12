@@ -39,6 +39,7 @@ ENV/
 
 # Streamlit
 .streamlit/secrets.toml
+!.streamlit/config.toml
 
 # Uploads & Reports
 uploads/*.jpg
