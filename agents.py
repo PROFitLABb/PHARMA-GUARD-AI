@@ -591,7 +591,13 @@ class PharmaGuardOrchestrator:
             
             # 2. RAG Arama - İlaç adı varsa
             drug_name = vision_result.get("ticari_ad", "")
-            if drug_name and drug_name != "Bilinmiyor" and vision_result.get("guven_puani", 0) > 0:
+            # Güven puanını integer'a çevir (string olabilir)
+            try:
+                guven_puani = int(vision_result.get("guven_puani", 0))
+            except (ValueError, TypeError):
+                guven_puani = 0
+            
+            if drug_name and drug_name != "Bilinmiyor" and guven_puani > 0:
                 try:
                     rag_results = self.rag_agent.search_prospectus(drug_name, "yan etkiler kullanım uyarıları")
                 except Exception as rag_error:
@@ -610,7 +616,13 @@ class PharmaGuardOrchestrator:
                 }]
             
             # 3. Güvenlik Denetimi - SADECE gerekirse
-            if vision_result.get("guven_puani", 0) > 3:
+            # Güven puanını integer'a çevir
+            try:
+                guven_puani = int(vision_result.get("guven_puani", 0))
+            except (ValueError, TypeError):
+                guven_puani = 0
+            
+            if guven_puani > 3:
                 try:
                     safety_result = self.safety_auditor.audit_safety(vision_result, rag_results)
                 except Exception as safety_error:

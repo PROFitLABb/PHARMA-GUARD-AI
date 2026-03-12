@@ -71,12 +71,20 @@ def calculate_confidence_score(data: dict) -> float:
     scores = []
     
     if "vision" in data and "guven_puani" in data["vision"]:
-        scores.append(data["vision"]["guven_puani"])
+        try:
+            score = float(data["vision"]["guven_puani"])
+            scores.append(score)
+        except (ValueError, TypeError):
+            pass
     
     if "safety" in data and "guven_puani" in data["safety"]:
-        scores.append(data["safety"]["guven_puani"])
+        try:
+            score = float(data["safety"]["guven_puani"])
+            scores.append(score)
+        except (ValueError, TypeError):
+            pass
     
-    return sum(scores) / len(scores) if scores else 0
+    return sum(scores) / len(scores) if scores else 0.0
 
 
 def create_data_directories():
